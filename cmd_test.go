@@ -33,16 +33,17 @@ func (s *cmdSuite) TestHookCommandOutput(c *gc.C) {
 
 func (s *cmdSuite) TestPatchExecutableNoArgs(c *gc.C) {
 	c.Log(testing.EchoQuotedArgs)
-	err := testing.PatchExecutable(s, c.MkDir(), "test-output", testing.EchoQuotedArgs)
-	c.Assert(err, gc.IsNil)
+	testing.PatchExecutable(c, s, "test-output", testing.EchoQuotedArgs)
 	output := runCommand(c, "test-output")
 	c.Assert(output, gc.Equals, "test-output\n")
+	testing.AssertEchoArgs(c, "test-output")
 }
 
 func (s *cmdSuite) TestPatchExecutableWithArgs(c *gc.C) {
-	testing.PatchExecutable(s, c.MkDir(), "test-output", testing.EchoQuotedArgs)
+	testing.PatchExecutable(c, s, "test-output", testing.EchoQuotedArgs)
 	output := runCommand(c, "test-output", "foo", "bar baz")
 	c.Assert(output, gc.Equals, "test-output \"foo\" \"bar baz\"\n")
+	testing.AssertEchoArgs(c, "test-output", "foo", "bar baz")
 }
 
 func runCommand(c *gc.C, command string, args ...string) string {

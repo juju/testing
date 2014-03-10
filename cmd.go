@@ -4,10 +4,13 @@
 package testing
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	gc "launchpad.net/gocheck"
 )
 
 // HookCommandOutput intercepts CommandOutput to a function that passes the
@@ -34,11 +37,14 @@ const (
 	// EchoQuotedArgs is a simple bash script that prints out the
 	// basename of the command followed by the args as quoted strings.
 	EchoQuotedArgs = `#!/bin/bash --norc
-printf "%s" ` + "`basename $0`" + `
+name=` + "`basename $0`" + `
+argfile="$name.out"
+rm -f $argfile
+printf "%s" $name | tee -a $argfile
 for arg in "$@"; do
-  printf " \"%s\""  "$arg"
+  printf " \"%s\""  "$arg" | tee -a $argfile
 done
-printf "\n"
+printf "\n" | tee -a $argfile
 `
 )
 
@@ -48,10 +54,25 @@ type EnvironmentPatcher interface {
 	PatchEnvironment(name, value string)
 }
 
-// PatchExecutable ensures that dir is in PATH and creates an executable
-// in dir called execName with script as the content.
-func PatchExecutable(patcher EnvironmentPatcher, dir, execName, script string) error {
+// PatchExecutable creates an executable called 'execName' in a new test
+// directory and that directory is added to the path.
+func PatchExecutable(c *gc.C, patcher EnvironmentPatcher, execName, script string) {
+	dir := c.MkDir()
 	patcher.PatchEnvironment("PATH", joinPathLists(dir, os.Getenv("PATH")))
 	filename := filepath.Join(dir, execName)
-	return ioutil.WriteFile(filename, []byte(script), 0755)
+	err := ioutil.WriteFile(filename, []byte(script), 0755)
+	c.Assert(err, gc.IsNil)
+}
+
+// AssertEchoArgs is used to check the args from an execution of a command
+// that has been patchec using PatchExecutable containing EchoQuotedArgs.
+func AssertEchoArgs(c *gc.C, execName string, args ...string) {
+	content, err := ioutil.ReadFile(execName + ".out")
+	c.Assert(err, gc.IsNil)
+	expected := execName
+	for _, arg := range args {
+		expected = fmt.Sprintf("%s %q", expected, arg)
+	}
+	expected += "\n"
+	c.Assert(string(content), gc.Equals, expected)
 }
