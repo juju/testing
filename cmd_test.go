@@ -11,7 +11,9 @@ import (
 	"github.com/juju/testing"
 )
 
-type cmdSuite struct{}
+type cmdSuite struct {
+	testing.CleanupSuite
+}
 
 var _ = gc.Suite(&cmdSuite{})
 
@@ -27,4 +29,25 @@ func (s *cmdSuite) TestHookCommandOutput(c *gc.C) {
 	cmd := <-cmdChan
 	c.Assert(out, gc.DeepEquals, []byte{1, 2, 3, 4})
 	c.Assert(cmd.Args, gc.DeepEquals, []string{"fake-command", "arg1", "arg2"})
+}
+
+func (s *cmdSuite) TestPatchExecutableNoArgs(c *gc.C) {
+	c.Log(testing.EchoQuotedArgs)
+	err := testing.PatchExecutable(s, c.MkDir(), "test-output", testing.EchoQuotedArgs)
+	c.Assert(err, gc.IsNil)
+	output := runCommand(c, "test-output")
+	c.Assert(output, gc.Equals, "test-output\n")
+}
+
+func (s *cmdSuite) TestPatchExecutableWithArgs(c *gc.C) {
+	testing.PatchExecutable(s, c.MkDir(), "test-output", testing.EchoQuotedArgs)
+	output := runCommand(c, "test-output", "foo", "bar baz")
+	c.Assert(output, gc.Equals, "test-output \"foo\" \"bar baz\"\n")
+}
+
+func runCommand(c *gc.C, command string, args ...string) string {
+	cmd := exec.Command(command, args...)
+	out, err := cmd.CombinedOutput()
+	c.Assert(err, gc.IsNil)
+	return string(out)
 }
