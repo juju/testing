@@ -9,6 +9,7 @@ import (
 	gc "launchpad.net/gocheck"
 
 	"github.com/juju/testing"
+	jc "github.com/juju/testing/checkers"
 )
 
 type cmdSuite struct {
@@ -31,19 +32,28 @@ func (s *cmdSuite) TestHookCommandOutput(c *gc.C) {
 	c.Assert(cmd.Args, gc.DeepEquals, []string{"fake-command", "arg1", "arg2"})
 }
 
+func (s *cmdSuite) EnsureArgFileRemoved(name string) {
+	s.AddCleanup(func(c *gc.C) {
+		c.Assert(name+".out", jc.DoesNotExist)
+	})
+}
+
+const testFunc = "test-ouput"
+
 func (s *cmdSuite) TestPatchExecutableNoArgs(c *gc.C) {
-	c.Log(testing.EchoQuotedArgs)
-	testing.PatchExecutable(c, s, "test-output", testing.EchoQuotedArgs)
-	output := runCommand(c, "test-output")
-	c.Assert(output, gc.Equals, "test-output\n")
-	testing.AssertEchoArgs(c, "test-output")
+	s.EnsureArgFileRemoved(testFunc)
+	testing.PatchExecutableAsEchoArgs(c, s, testFunc)
+	output := runCommand(c, testFunc)
+	c.Assert(output, gc.Equals, testFunc+"\n")
+	testing.AssertEchoArgs(c, testFunc)
 }
 
 func (s *cmdSuite) TestPatchExecutableWithArgs(c *gc.C) {
-	testing.PatchExecutable(c, s, "test-output", testing.EchoQuotedArgs)
-	output := runCommand(c, "test-output", "foo", "bar baz")
-	c.Assert(output, gc.Equals, "test-output \"foo\" \"bar baz\"\n")
-	testing.AssertEchoArgs(c, "test-output", "foo", "bar baz")
+	s.EnsureArgFileRemoved(testFunc)
+	testing.PatchExecutableAsEchoArgs(c, s, testFunc)
+	output := runCommand(c, testFunc, "foo", "bar baz")
+	c.Assert(output, gc.Equals, testFunc+" \"foo\" \"bar baz\"\n")
+	testing.AssertEchoArgs(c, testFunc, "foo", "bar baz")
 }
 
 func runCommand(c *gc.C, command string, args ...string) string {

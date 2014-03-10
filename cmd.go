@@ -64,6 +64,22 @@ func PatchExecutable(c *gc.C, patcher EnvironmentPatcher, execName, script strin
 	c.Assert(err, gc.IsNil)
 }
 
+type CleanupPatcher interface {
+	PatchEnvironment(name, value string)
+	AddCleanup(cleanup CleanupFunc)
+}
+
+// PatchExecutableAsEchoArgs creates an executable called 'execName' in a new
+// test directory and that directory is added to the path. The content of the
+// script is 'EchoQuotedArgs', and the args file is removed using a cleanup
+// function.
+func PatchExecutableAsEchoArgs(c *gc.C, patcher CleanupPatcher, execName string) {
+	PatchExecutable(c, patcher, execName, EchoQuotedArgs)
+	patcher.AddCleanup(func(*gc.C) {
+		os.Remove(execName + ".out")
+	})
+}
+
 // AssertEchoArgs is used to check the args from an execution of a command
 // that has been patchec using PatchExecutable containing EchoQuotedArgs.
 func AssertEchoArgs(c *gc.C, execName string, args ...string) {
