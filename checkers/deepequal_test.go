@@ -69,8 +69,8 @@ var deepEqualTests = []DeepEqualTest{
 	{Basic{1, 0}, Basic{2, 0}, false, `mismatch at \.x: unequal; obtained 1; expected 2`},
 	{map[int]string{1: "one", 3: "two"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at \[3\]: validity mismatch; obtained "two"; expected <nil>`},
 	{map[int]string{1: "one", 2: "txo"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at \[2\]: unequal; obtained "txo"; expected "two"`},
-	{map[int]string{1: "one"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at top level: length mismatch, 1 vs 2; obtained map\[int\]string\{1:"one"\}; expected map\[int\]string\{2:"two", 1:"one"\}`},
-	{map[int]string{2: "two", 1: "one"}, map[int]string{1: "one"}, false, `mismatch at top level: length mismatch, 2 vs 1; obtained map\[int\]string\{2:"two", 1:"one"\}; expected map\[int\]string\{1:"one"\}`},
+	{map[int]string{1: "one"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at top level: length mismatch, 1 vs 2; obtained map\[int\]string\{1:"one"\}; expected map\[int\]string\{.*\}`},
+	{map[int]string{2: "two", 1: "one"}, map[int]string{1: "one"}, false, `mismatch at top level: length mismatch, 2 vs 1; obtained map\[int\]string\{.*\}; expected map\[int\]string\{1:"one"\}`},
 	{nil, 1, false, `mismatch at top level: nil vs non-nil mismatch; obtained <nil>; expected 1`},
 	{1, nil, false, `mismatch at top level: nil vs non-nil mismatch; obtained 1; expected <nil>`},
 	{fn1, fn3, false, `mismatch at top level: non-nil functions; obtained \(func\(\)\)\(nil\); expected \(func\(\)\)\(0x[0-9a-f]+\)`},
@@ -88,7 +88,12 @@ var deepEqualTests = []DeepEqualTest{
 	{[]int{1, 2, 3}, [3]int{1, 2, 3}, false, `mismatch at top level: type mismatch \[\]int vs \[3\]int; obtained \[\]int\{1, 2, 3\}; expected \[3\]int\{1, 2, 3\}`},
 	{&[3]interface{}{1, 2, 4}, &[3]interface{}{1, 2, "s"}, false, `mismatch at \(\*\)\[2\]: type mismatch int vs string; obtained 4; expected "s"`},
 	{Basic{1, 0.5}, NotBasic{1, 0.5}, false, `mismatch at top level: type mismatch checkers_test\.Basic vs checkers_test\.NotBasic; obtained checkers_test\.Basic\{x:1, y:0\.5\}; expected checkers_test\.NotBasic\{x:1, y:0\.5\}`},
-	{map[uint]string{1: "one", 2: "two"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at top level: type mismatch map\[uint\]string vs map\[int\]string; obtained map\[uint\]string\{0x1:"one", 0x2:"two"\}; expected map\[int\]string\{2:"two", 1:"one"\}`},
+	{
+		map[uint]string{1: "one", 2: "two"},
+		map[int]string{2: "two", 1: "one"},
+		false,
+		`mismatch at top level: type mismatch map\[uint\]string vs map\[int\]string; obtained map\[uint\]string\{.*\}; expected map\[int\]string\{.*\}`,
+	},
 }
 
 func TestDeepEqual(t *testing.T) {
