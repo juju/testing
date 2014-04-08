@@ -13,6 +13,8 @@ import (
 	gc "launchpad.net/gocheck"
 )
 
+var HookChannelSize = 10
+
 // HookCommandOutput intercepts CommandOutput to a function that passes the
 // actual command and it's output back via a channel, and returns the error
 // passed into this function.  It also returns a cleanup function so you can
@@ -20,7 +22,7 @@ import (
 func HookCommandOutput(
 	outputFunc *func(cmd *exec.Cmd) ([]byte, error), output []byte, err error) (<-chan *exec.Cmd, func()) {
 
-	cmdChan := make(chan *exec.Cmd, 1)
+	cmdChan := make(chan *exec.Cmd, HookChannelSize)
 	origCommandOutput := *outputFunc
 	cleanup := func() {
 		close(cmdChan)
