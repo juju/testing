@@ -167,31 +167,19 @@ func (s *LogMatchesSuite) TestFromLogMatches(c *gc.C) {
 func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsSliceTestLogValues(c *gc.C) {
 	obtained := []string{"banana"} // specifically not []loggo.TestLogValues
 	expected := jc.SimpleMessages{}
-	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil /* unused */)
+	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil)
 	c.Assert(result, gc.Equals, false)
 	c.Assert(err, gc.Equals, "Obtained value must be of type []loggo.TestLogValues or SimpleMessage")
 }
 
 func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsStringOrSimpleMessages(c *gc.C) {
-	var obtained interface{} = []loggo.TestLogValues{
+	obtained := []loggo.TestLogValues{
 		{Level: loggo.INFO, Message: "foo bar"},
 		{Level: loggo.INFO, Message: "baz"},
+		{Level: loggo.DEBUG, Message: "12345"},
 	}
-	var expected interface{} = jc.SimpleMessages{
-		{loggo.INFO, "foo bar"},
-		{loggo.INFO, "12345"},
-	}
-	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil /* unused */)
-	c.Assert(result, gc.Equals, false)
-	c.Assert(err, gc.Equals, "")
-
-	expected = []string{"foo bar", "12345"}
-	result, err = jc.LogMatches.Check([]interface{}{obtained, expected}, nil /* unused */)
-	c.Assert(result, gc.Equals, false)
-	c.Assert(err, gc.Equals, "")
-
-	expected = "totally wrong"
-	result, err = jc.LogMatches.Check([]interface{}{obtained, expected}, nil /* unused */)
+	expected := "totally wrong"
+	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil)
 	c.Assert(result, gc.Equals, false)
 	c.Assert(err, gc.Equals, "Expected value must be of type []string or []SimpleMessage")
 }
