@@ -6,10 +6,9 @@ import (
 	"path/filepath"
 	"text/template"
 
-	gc "launchpad.net/gocheck"
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing"
-
+	jc "github.com/juju/testing/checkers"
+	gc "launchpad.net/gocheck"
 )
 
 type importsSuite struct {
