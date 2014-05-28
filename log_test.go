@@ -1,20 +1,20 @@
 // Copyright 2013, 2014 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package logging_test
+package testing_test
 
 import (
 	gc "launchpad.net/gocheck"
 
 	"github.com/juju/loggo"
 
-	"github.com/juju/testing/logging"
+	"github.com/juju/testing"
 )
 
 var logger = loggo.GetLogger("test")
 
 type logSuite struct {
-	logging.LoggingSuite
+	testing.LoggingSuite
 }
 
 var _ = gc.Suite(&logSuite{})
@@ -32,6 +32,8 @@ func (s *logSuite) TearDownSuite(c *gc.C) {
 	// a previously set up *gc.C. We print a message
 	// anyway so that we can manually verify it.
 	logger.Infof("testing-TearDownSuite")
+	s.LoggingSuite.TearDownSuite(c)
+	logger.Infof("YOU SHOULD NOT SEE THIS")
 }
 
 func (s *logSuite) SetUpTest(c *gc.C) {
@@ -45,7 +47,6 @@ func (s *logSuite) SetUpTest(c *gc.C) {
 func (s *logSuite) TearDownTest(c *gc.C) {
 	// The same applies here as to TearDownSuite.
 	logger.Infof("testing-TearDownTest")
-	s.LoggingSuite.TearDownTest(c)
 }
 
 func (s *logSuite) TestLog(c *gc.C) {
