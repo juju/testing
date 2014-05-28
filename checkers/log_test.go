@@ -10,6 +10,34 @@ import (
 	jc "github.com/juju/testing/checkers"
 )
 
+type SimpleMessageSuite struct{}
+
+var _ = gc.Suite(&SimpleMessageSuite{})
+
+func (s *SimpleMessageSuite) TestSimpleMessageString(c *gc.C) {
+	m := jc.SimpleMessage{
+		Level: loggo.INFO,
+		Message: `hello
+world
+`,
+	}
+	c.Check(m.String(), gc.Matches, "INFO hello\nworld\n")
+}
+
+func (s *SimpleMessageSuite) TestSimpleMessagesGoString(c *gc.C) {
+	m := jc.SimpleMessages{{
+		Level:   loggo.DEBUG,
+		Message: "debug",
+	}, {
+		Level:   loggo.ERROR,
+		Message: "Error",
+	}}
+	c.Check(m.GoString(), gc.Matches, `SimpleMessages{
+DEBUG debug
+ERROR Error
+}`)
+}
+
 type LogMatchesSuite struct{}
 
 var _ = gc.Suite(&LogMatchesSuite{})
@@ -34,6 +62,31 @@ func (s *LogMatchesSuite) TestMatchSimpleMessage(c *gc.C) {
 		{loggo.INFO, "12345"},
 	})
 	c.Check(log, gc.Not(jc.LogMatches), []jc.SimpleMessage{
+		{loggo.INFO, "foo bar"},
+		{loggo.DEBUG, "12345"},
+	})
+}
+
+func (s *LogMatchesSuite) TestMatchSimpleMessages(c *gc.C) {
+	log := []loggo.TestLogValues{
+		{Level: loggo.INFO, Message: "foo bar"},
+		{Level: loggo.INFO, Message: "12345"},
+	}
+	c.Check(log, jc.LogMatches, jc.SimpleMessages{
+		{loggo.INFO, "foo bar"},
+		{loggo.INFO, "12345"},
+	})
+	c.Check(log, jc.LogMatches, jc.SimpleMessages{
+		{loggo.INFO, "foo .*"},
+		{loggo.INFO, "12345"},
+	})
+	// UNSPECIFIED means we don't care what the level is,
+	// just check the message string matches.
+	c.Check(log, jc.LogMatches, jc.SimpleMessages{
+		{loggo.UNSPECIFIED, "foo .*"},
+		{loggo.INFO, "12345"},
+	})
+	c.Check(log, gc.Not(jc.LogMatches), jc.SimpleMessages{
 		{loggo.INFO, "foo bar"},
 		{loggo.DEBUG, "12345"},
 	})
@@ -109,4 +162,33 @@ func (s *LogMatchesSuite) TestFromLogMatches(c *gc.C) {
 		{loggo.INFO, "foo"},
 		{loggo.INFO, "bar"},
 	})
+}
+
+func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsSliceTestLogValues(c *gc.C) {
+	obtained := []string{"banana"} // specifically not []loggo.TestLogValues
+	expected := jc.SimpleMessages{}
+	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil)
+	c.Assert(result, gc.Equals, false)
+	c.Assert(err, gc.Equals, "Obtained value must be of type []loggo.TestLogValues or SimpleMessage")
+}
+
+func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsStringOrSimpleMessages(c *gc.C) {
+	obtained := []loggo.TestLogValues{
+		{Level: loggo.INFO, Message: "foo bar"},
+		{Level: loggo.INFO, Message: "baz"},
+		{Level: loggo.DEBUG, Message: "12345"},
+	}
+	expected := "totally wrong"
+	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil)
+	c.Assert(result, gc.Equals, false)
+	c.Assert(err, gc.Equals, "Expected value must be of type []string or []SimpleMessage")
+}
+
+func (s *LogMatchesSuite) TestLogMatchesFailsOnInvalidRegex(c *gc.C) {
+	var obtained interface{} = []loggo.TestLogValues{{Level: loggo.INFO, Message: "foo bar"}}
+	var expected interface{} = []string{"[]foo"}
+
+	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil /* unused */)
+	c.Assert(result, gc.Equals, false)
+	c.Assert(err, gc.Equals, "bad message regexp \"[]foo\": error parsing regexp: missing closing ]: `[]foo`")
 }

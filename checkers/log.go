@@ -44,7 +44,7 @@ type logMatches struct {
 	*gc.CheckerInfo
 }
 
-func (checker *logMatches) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *logMatches) Check(params []interface{}, _ []string) (result bool, error string) {
 	var obtained SimpleMessages
 	switch params[0].(type) {
 	case []loggo.TestLogValues:
@@ -79,8 +79,7 @@ func (checker *logMatches) Check(params []interface{}, names []string) (result b
 		if expect.Level != loggo.UNSPECIFIED && msg.Level != expect.Level {
 			continue
 		}
-		matched, err := regexp.MatchString(expect.Message, msg.Message)
-		if err != nil {
+		if matched, err := regexp.MatchString(expect.Message, msg.Message); err != nil {
 			return false, fmt.Sprintf("bad message regexp %q: %v", expect.Message, err)
 		} else if !matched {
 			continue
