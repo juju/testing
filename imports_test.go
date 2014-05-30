@@ -29,7 +29,7 @@ var pkgs = [][]string{{
 }, {
 	"arble.com/bar", "furble.com/fur",
 }, {
-	"furble.com/fur", "fmt",
+	"furble.com/fur", "fmt", "C",
 }}
 
 var importsTests = []struct {

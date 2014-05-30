@@ -31,6 +31,9 @@ func FindImports(packageName, prefix string) ([]string, error) {
 // findImports recursively adds all imported packages of given
 // package (packageName) to allPkgs map.
 func findImports(packageName string, allPkgs map[string]bool) error {
+	if packageName == "C" {
+		return nil
+	}
 	pkg, err := build.Default.Import(packageName, "", 0)
 	if err != nil {
 		return fmt.Errorf("cannot find %q: %v", packageName, err)
