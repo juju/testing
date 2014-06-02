@@ -21,7 +21,7 @@ type gocheckWriter struct {
 }
 
 var logConfig = func() string {
-	if cfg := os.Getenv("JUJU_LOGGING_CONFIG"); cfg != "" {
+	if cfg := os.Getenv("TEST_LOGGING_CONFIG"); cfg != "" {
 		return cfg
 	}
 	return "DEBUG"
