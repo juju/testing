@@ -5,6 +5,7 @@ package testing
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/juju/loggo"
@@ -18,6 +19,13 @@ type LoggingSuite struct{}
 type gocheckWriter struct {
 	c *gc.C
 }
+
+var logConfig = func() string {
+	if cfg := os.Getenv("JUJU_LOGGING_CONFIG"); cfg != "" {
+		return cfg
+	}
+	return "DEBUG"
+}()
 
 func (w *gocheckWriter) Write(level loggo.Level, module, filename string, line int, timestamp time.Time, message string) {
 	// Magic calldepth value...
@@ -45,6 +53,8 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 	loggo.ResetWriters()
 	loggo.ReplaceDefaultWriter(&gocheckWriter{c})
 	loggo.ResetLoggers()
+	err := loggo.ConfigureLoggers(logConfig)
+	c.Assert(err, gc.IsNil)
 }
 
 // LoggingCleanupSuite is defined for backward compatibility.

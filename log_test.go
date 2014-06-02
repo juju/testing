@@ -1,58 +1,47 @@
 // Copyright 2013, 2014 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package testing_test
+package testing
 
 import (
 	gc "launchpad.net/gocheck"
 
 	"github.com/juju/loggo"
-
-	"github.com/juju/testing"
 )
 
-var logger = loggo.GetLogger("test")
-
-type logSuite struct {
-	testing.LoggingSuite
-}
+type logSuite struct{}
 
 var _ = gc.Suite(&logSuite{})
 
-func (s *logSuite) SetUpSuite(c *gc.C) {
-	s.LoggingSuite.SetUpSuite(c)
-	logger.SetLogLevel(loggo.INFO)
-	logger.Infof("testing-SetUpSuite")
-	c.Assert(c.GetTestLog(), gc.Matches, ".*INFO test testing-SetUpSuite\n")
-}
+func (*logSuite) TestLog(c *gc.C) {
+	logger := loggo.GetLogger("test")
+	jujuLogger := loggo.GetLogger("juju")
+	logConfig = "<root>=DEBUG;juju=TRACE"
 
-func (s *logSuite) TearDownSuite(c *gc.C) {
-	// Unfortunately there's no way of testing that the
-	// log output is printed, as the logger is printing
-	// a previously set up *gc.C. We print a message
-	// anyway so that we can manually verify it.
-	logger.Infof("testing-TearDownSuite")
-	s.LoggingSuite.TearDownSuite(c)
-	logger.Infof("YOU SHOULD NOT SEE THIS")
-}
+	c.Assert(logger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)
+	var suite LoggingSuite
+	suite.SetUpSuite(c)
 
-func (s *logSuite) SetUpTest(c *gc.C) {
-	s.LoggingSuite.SetUpTest(c)
-	// The SetUpTest resets the logging levels.
-	logger.SetLogLevel(loggo.INFO)
-	logger.Infof("testing-SetUpTest")
-	c.Assert(c.GetTestLog(), gc.Matches, ".*INFO test testing-SetUpTest\n")
-}
+	c.Assert(logger.EffectiveLogLevel(), gc.Equals, loggo.DEBUG)
+	c.Assert(jujuLogger.EffectiveLogLevel(), gc.Equals, loggo.TRACE)
 
-func (s *logSuite) TearDownTest(c *gc.C) {
-	// The same applies here as to TearDownSuite.
-	logger.Infof("testing-TearDownTest")
-}
+	logger.Debugf("message 1")
+	logger.Tracef("message 2")
+	jujuLogger.Tracef("message 3")
 
-func (s *logSuite) TestLog(c *gc.C) {
-	logger.Infof("testing-Test")
 	c.Assert(c.GetTestLog(), gc.Matches,
-		".*INFO test testing-SetUpTest\n"+
-			".*INFO test testing-Test\n",
+		".*DEBUG test message 1\n"+
+			".*TRACE juju message 3\n",
 	)
+	suite.TearDownSuite(c)
+	logger.Debugf("message 1")
+	logger.Tracef("message 2")
+	jujuLogger.Tracef("message 3")
+
+	c.Assert(c.GetTestLog(), gc.Matches,
+		".*DEBUG test message 1\n"+
+			".*TRACE juju message 3\n",
+	)
+	c.Assert(logger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)
+	c.Assert(jujuLogger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)
 }
