@@ -11,7 +11,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
-	ft "github.com/juju/juju/testing/filetesting"
+	ft "github.com/juju/testing/filetesting"
 )
 
 type EntrySuite struct {
