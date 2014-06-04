@@ -12,7 +12,7 @@ import (
 
 // stdlib repesents the packages that belong to the standard library.
 var stdlib = map[string]bool{
-	"C":                   true, // not really a package, but has not dependencies
+	"C":                   true, // not really a package
 	"archive/tar":         true,
 	"archive/zip":         true,
 	"bufio":               true,
