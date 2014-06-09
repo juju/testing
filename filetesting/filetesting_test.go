@@ -29,11 +29,11 @@ func (s *EntrySuite) join(path string) string {
 }
 
 func (s *EntrySuite) TestFileCreate(c *gc.C) {
-	ft.File{"foobar", "hello", 0644}.Create(c, s.basePath)
+	ft.File{"foobar", "hello", 0666}.Create(c, s.basePath)
 	path := s.join("foobar")
 	info, err := os.Lstat(path)
 	c.Assert(err, gc.IsNil)
-	c.Assert(info.Mode()&os.ModePerm, gc.Equals, os.FileMode(0644))
+	c.Assert(info.Mode()&os.ModePerm, gc.Equals, os.FileMode(0666))
 	c.Assert(info.Mode()&os.ModeType, gc.Equals, os.FileMode(0))
 	data, err := ioutil.ReadFile(path)
 	c.Assert(err, gc.IsNil)
