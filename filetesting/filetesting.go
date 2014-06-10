@@ -103,12 +103,14 @@ func (d Dir) Create(c *gc.C, basePath string) Entry {
 }
 
 func (d Dir) Check(c *gc.C, basePath string) Entry {
-	fileInfo, err := os.Lstat(join(basePath, d.Path))
-	if !c.Check(err, gc.IsNil) {
+	path := join(basePath, d.Path)
+	fileInfo, err := os.Lstat(path)
+	comment := gc.Commentf("dir %q", path)
+	if !c.Check(err, gc.IsNil, comment) {
 		return d
 	}
-	c.Check(fileInfo.Mode()&os.ModePerm, gc.Equals, d.Perm)
-	c.Check(fileInfo.Mode()&os.ModeType, gc.Equals, os.ModeDir)
+	c.Check(fileInfo.Mode()&os.ModePerm, gc.Equals, d.Perm, comment)
+	c.Check(fileInfo.Mode()&os.ModeType, gc.Equals, os.ModeDir, comment)
 	return d
 }
 
@@ -125,7 +127,10 @@ func (f File) GetPath() string {
 }
 
 func (f File) Create(c *gc.C, basePath string) Entry {
-	err := ioutil.WriteFile(join(basePath, f.Path), []byte(f.Data), f.Perm)
+	path := join(basePath, f.Path)
+	err := ioutil.WriteFile(path, []byte(f.Data), f.Perm)
+	c.Assert(err, gc.IsNil)
+	err = os.Chmod(path, f.Perm)
 	c.Assert(err, gc.IsNil)
 	return f
 }
@@ -133,15 +138,16 @@ func (f File) Create(c *gc.C, basePath string) Entry {
 func (f File) Check(c *gc.C, basePath string) Entry {
 	path := join(basePath, f.Path)
 	fileInfo, err := os.Lstat(path)
-	if !c.Check(err, gc.IsNil) {
+	comment := gc.Commentf("file %q", path)
+	if !c.Check(err, gc.IsNil, comment) {
 		return f
 	}
 	mode := fileInfo.Mode()
-	c.Check(mode&os.ModeType, gc.Equals, os.FileMode(0))
-	c.Check(mode&os.ModePerm, gc.Equals, f.Perm)
+	c.Check(mode&os.ModeType, gc.Equals, os.FileMode(0), comment)
+	c.Check(mode&os.ModePerm, gc.Equals, f.Perm, comment)
 	data, err := ioutil.ReadFile(path)
-	c.Check(err, gc.IsNil)
-	c.Check(string(data), gc.Equals, f.Data)
+	c.Check(err, gc.IsNil, comment)
+	c.Check(string(data), gc.Equals, f.Data, comment)
 	return f
 }
 
@@ -163,9 +169,11 @@ func (s Symlink) Create(c *gc.C, basePath string) Entry {
 }
 
 func (s Symlink) Check(c *gc.C, basePath string) Entry {
-	link, err := os.Readlink(join(basePath, s.Path))
-	c.Check(err, gc.IsNil)
-	c.Check(link, gc.Equals, s.Link)
+	path := join(basePath, s.Path)
+	comment := gc.Commentf("symlink %q", path)
+	link, err := os.Readlink(path)
+	c.Check(err, gc.IsNil, comment)
+	c.Check(link, gc.Equals, s.Link, comment)
 	return s
 }
 
@@ -186,11 +194,12 @@ func (r Removed) Create(c *gc.C, basePath string) Entry {
 }
 
 func (r Removed) Check(c *gc.C, basePath string) Entry {
-	_, err := os.Lstat(join(basePath, r.Path))
+	path := join(basePath, r.Path)
+	_, err := os.Lstat(path)
 	// isNotExist allows us to handle the following case:
 	//  File{"foo", ...}.Create(...)
 	//  Removed{"foo/bar"}.Check(...)
 	// ...where os.IsNotExist would not work.
-	c.Assert(err, jc.Satisfies, isNotExist)
+	c.Check(err, jc.Satisfies, isNotExist, gc.Commentf("removed %q", path))
 	return r
 }
