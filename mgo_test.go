@@ -4,43 +4,37 @@
 package testing_test
 
 import (
-	stdtesting "testing"
-
 	"labix.org/v2/mgo/bson"
 	gc "launchpad.net/gocheck"
 
-	"github.com/juju/juju/testing"
+	"github.com/juju/testing"
 )
 
 type mgoSuite struct {
-	testing.BaseSuite
+	testing.IsolationSuite
 	testing.MgoSuite
 }
 
 var _ = gc.Suite(&mgoSuite{})
 
-func TestMgoSuite(t *stdtesting.T) {
-	testing.MgoTestPackage(t)
-}
-
 func (s *mgoSuite) SetUpSuite(c *gc.C) {
-	s.BaseSuite.SetUpSuite(c)
+	s.IsolationSuite.SetUpSuite(c)
 	s.MgoSuite.SetUpSuite(c)
 }
 
 func (s *mgoSuite) TearDownSuite(c *gc.C) {
-	s.BaseSuite.TearDownSuite(c)
 	s.MgoSuite.TearDownSuite(c)
+	s.IsolationSuite.TearDownSuite(c)
 }
 
 func (s *mgoSuite) SetUpTest(c *gc.C) {
-	s.BaseSuite.SetUpTest(c)
+	s.IsolationSuite.SetUpTest(c)
 	s.MgoSuite.SetUpTest(c)
 }
 
 func (s *mgoSuite) TearDownTest(c *gc.C) {
-	s.BaseSuite.TearDownTest(c)
 	s.MgoSuite.TearDownTest(c)
+	s.IsolationSuite.TearDownTest(c)
 }
 
 func (s *mgoSuite) TestResetWhenUnauthorized(c *gc.C) {
