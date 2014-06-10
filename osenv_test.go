@@ -43,3 +43,17 @@ func (s *osEnvSuite) TestTestingEnvironment(c *gc.C) {
 	s.osEnvSuite.TearDownSuite(c)
 	c.Assert(os.Getenv("TESTING_OSENV_NEW"), gc.Equals, "")
 }
+
+func getPath() string {
+	return os.Getenv("PATH")
+}
+
+func (s *osEnvSuite) TestPathKeptInTestingEnvironment(c *gc.C) {
+	// osenv calls os.Clearenv but some tests need PATH to call binaries. Make
+	// sure PATH is preserved for those tests.
+	path := getPath()
+	s.osEnvSuite.SetUpSuite(c)
+	c.Assert(getPath(), gc.Equals, path)
+	s.osEnvSuite.SetUpTest(c)
+	c.Assert(getPath(), gc.Equals, path)
+}

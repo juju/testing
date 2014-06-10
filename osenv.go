@@ -23,6 +23,7 @@ func (s *OsEnvSuite) SetUpSuite(c *gc.C) {
 		s.oldEnvironment[parts[0]] = parts[1]
 	}
 	os.Clearenv()
+	os.Setenv("PATH", s.oldEnvironment["PATH"])
 }
 
 func (s *OsEnvSuite) TearDownSuite(c *gc.C) {
@@ -34,6 +35,7 @@ func (s *OsEnvSuite) TearDownSuite(c *gc.C) {
 
 func (s *OsEnvSuite) SetUpTest(c *gc.C) {
 	os.Clearenv()
+	os.Setenv("PATH", s.oldEnvironment["PATH"])
 }
 
 func (s *OsEnvSuite) TearDownTest(c *gc.C) {
