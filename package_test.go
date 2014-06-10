@@ -4,11 +4,11 @@
 package testing_test
 
 import (
-	"testing"
+	stdtesting "testing"
 
-	gc "launchpad.net/gocheck"
+	"github.com/juju/testing"
 )
 
-func Test(t *testing.T) {
-	gc.TestingT(t)
+func Test(t *stdtesting.T) {
+	testing.MgoTestPackage(t, nil)
 }
