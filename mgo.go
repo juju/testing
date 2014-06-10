@@ -45,12 +45,17 @@ const (
 	DefaultMongoPassword = "conn-from-name-secret"
 )
 
-// Certs holds the certificates and keys used to generate the server PEM file
-// and to establish secure connections to the mongo database.
+// Certs holds the certificates and keys required to make a secure
+// SSL connection.
 type Certs struct {
-	CACert     *x509.Certificate
+	// CACert holds the CA certificate. This must certify the private key that
+	// was used to sign the server certificate.
+	CACert *x509.Certificate
+	// ServerCert holds the certificate that certifies the server's
+	// private key.
 	ServerCert *x509.Certificate
-	ServerKey  *rsa.PrivateKey
+	// ServerKey holds the server's private key.
+	ServerKey *rsa.PrivateKey
 }
 
 type MgoInstance struct {
@@ -314,9 +319,10 @@ func (inst *MgoInstance) Restart() {
 	}
 }
 
-// MgoTestPackageSsl should be called to register the tests for any package
-// that requires a secure connection to a MongoDB server.
-func MgoTestPackageSsl(t *testing.T, certs *Certs) {
+// MgoTestPackage should be called to register the tests for any package
+// that requires a MongoDB server. If certs is non-nil, a secure SSL connection
+// will be used from client to server.
+func MgoTestPackage(t *testing.T, certs *Certs) {
 	if err := MgoServer.Start(certs); err != nil {
 		t.Fatal(err)
 	}
@@ -324,17 +330,10 @@ func MgoTestPackageSsl(t *testing.T, certs *Certs) {
 	gc.TestingT(t)
 }
 
-// MgoTestPackage should be called to register the tests for any package that
-// requires a MongoDB server without TLS support.
-func MgoTestPackage(t *testing.T) {
-	MgoTestPackageSsl(t, nil)
-}
-
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
-	mgo.SetDebug(true)
 	mgo.SetStats(true)
 	// Make tests that use password authentication faster.
 	utils.FastInsecureHash = true

@@ -10,5 +10,5 @@ import (
 )
 
 func Test(t *stdtesting.T) {
-	testing.MgoTestPackage(t)
+	testing.MgoTestPackage(t, nil)
 }
