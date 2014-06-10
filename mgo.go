@@ -6,16 +6,13 @@ package testing
 import (
 	"bufio"
 	"bytes"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/big"
 	"net"
 	"os"
 	"os/exec"
@@ -48,6 +45,14 @@ const (
 	DefaultMongoPassword = "conn-from-name-secret"
 )
 
+// Certs holds the certificates and keys used to generate the server PEM file
+// and to establish secure connections to the mongo database.
+type Certs struct {
+	CACert     *x509.Certificate
+	ServerCert *x509.Certificate
+	ServerKey  *rsa.PrivateKey
+}
+
 type MgoInstance struct {
 	// addr holds the address of the MongoDB server
 	addr string
@@ -64,11 +69,8 @@ type MgoInstance struct {
 	// dir holds the directory that MongoDB is running in.
 	dir string
 
-	// caCert holds the CA certificate for the TLS connection.
-	caCert *x509.Certificate
-
-	// caKey holds the CA private key for the TLS connection.
-	caKey *rsa.PrivateKey
+	// certs holds certificates for the TLS connection.
+	certs *Certs
 
 	// Params is a list of additional parameters that will be passed to
 	// the mongod application
@@ -100,46 +102,24 @@ type MgoSuite struct {
 	Session *mgo.Session
 }
 
-// generateCert receives the CA certificate and private key and creates a
-// PEM file in the given path.
-func generateCert(path string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
-	now := time.Now()
-	key, err := rsa.GenerateKey(rand.Reader, 512)
-	if err != nil {
-		return fmt.Errorf("cannot generate key: %v", err)
-	}
-	// Create the server certificate.
-	template := &x509.Certificate{
-		SerialNumber: new(big.Int),
-		Subject: pkix.Name{
-			// This won't match host names with dots. The hostname
-			// is hardcoded when connecting to avoid the issue.
-			CommonName: "*",
-		},
-		NotBefore: now.UTC().Add(-5 * time.Minute),
-		NotAfter:  now.AddDate(10, 0, 0).UTC(),
-		KeyUsage:  x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageKeyAgreement,
-	}
-	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, &key.PublicKey, caKey)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate: %v", err)
-	}
-	// Save the cert file.
-	certFile, err := os.Create(path)
+// generatePEM receives server certificate and the server private key
+// and creates a PEM file in the given path.
+func generatePEM(path string, serverCert *x509.Certificate, serverKey *rsa.PrivateKey) error {
+	pemFile, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("failed to open %q for writing: %v", path, err)
 	}
-	defer certFile.Close()
-	err = pem.Encode(certFile, &pem.Block{
+	defer pemFile.Close()
+	err = pem.Encode(pemFile, &pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: certDER,
+		Bytes: serverCert.Raw,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to write cert to %q: %v", path, err)
 	}
-	err = pem.Encode(certFile, &pem.Block{
+	err = pem.Encode(pemFile, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
+		Bytes: x509.MarshalPKCS1PrivateKey(serverKey),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to write private key to %q: %v", path, err)
@@ -148,7 +128,7 @@ func generateCert(path string, caCert *x509.Certificate, caKey *rsa.PrivateKey) 
 }
 
 // Start starts a MongoDB server in a temporary directory.
-func (inst *MgoInstance) Start(caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+func (inst *MgoInstance) Start(certs *Certs) error {
 	dbdir, err := ioutil.TempDir("", "test-mgo")
 	if err != nil {
 		return err
@@ -162,14 +142,13 @@ func (inst *MgoInstance) Start(caCert *x509.Certificate, caKey *rsa.PrivateKey) 
 		return fmt.Errorf("cannot write key file: %v", err)
 	}
 
-	if caCert != nil {
+	if certs != nil {
 		// Generate and save the server.pem file.
 		pemPath := filepath.Join(dbdir, "server.pem")
-		if err = generateCert(pemPath, caCert, caKey); err != nil {
+		if err = generatePEM(pemPath, certs.ServerCert, certs.ServerKey); err != nil {
 			return fmt.Errorf("cannot write cert/key PEM: %v", err)
 		}
-		inst.caCert = caCert
-		inst.caKey = caKey
+		inst.certs = certs
 	}
 
 	// Attempt to start mongo up to maxStartMongodAttempts times,
@@ -218,7 +197,7 @@ func (inst *MgoInstance) run() error {
 		"--oplogSize", "10",
 		"--keyFile", filepath.Join(inst.dir, "keyfile"),
 	}
-	if inst.caCert != nil {
+	if inst.certs != nil {
 		mgoargs = append(mgoargs,
 			"--sslOnNormalPorts",
 			"--sslPEMKeyFile", filepath.Join(inst.dir, "server.pem"),
@@ -330,18 +309,15 @@ func (inst *MgoInstance) DestroyWithLog() {
 func (inst *MgoInstance) Restart() {
 	logger.Debugf("restarting mongod pid %d in %s on port %d", inst.server.Process.Pid, inst.dir, inst.port)
 	inst.kill(os.Kill)
-	if err := inst.Start(inst.caCert, inst.caKey); err != nil {
+	if err := inst.Start(inst.certs); err != nil {
 		panic(err)
 	}
 }
 
 // MgoTestPackageSsl should be called to register the tests for any package
 // that requires a secure connection to a MongoDB server.
-func MgoTestPackageSsl(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) {
-	if (caCert == nil) != (caKey == nil) {
-		t.Fatal("caCert and caKey: both or neither must be specified")
-	}
-	if err := MgoServer.Start(caCert, caKey); err != nil {
+func MgoTestPackageSsl(t *testing.T, certs *Certs) {
+	if err := MgoServer.Start(certs); err != nil {
 		t.Fatal(err)
 	}
 	defer MgoServer.Destroy()
@@ -351,7 +327,7 @@ func MgoTestPackageSsl(t *testing.T, caCert *x509.Certificate, caKey *rsa.Privat
 // MgoTestPackage should be called to register the tests for any package that
 // requires a MongoDB server without TLS support.
 func MgoTestPackage(t *testing.T) {
-	MgoTestPackageSsl(t, nil, nil)
+	MgoTestPackageSsl(t, nil)
 }
 
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
@@ -428,7 +404,7 @@ func (inst *MgoInstance) Dial() (*mgo.Session, error) {
 // DialInfo returns information suitable for dialling the
 // receiving MongoDB instance.
 func (inst *MgoInstance) DialInfo() *mgo.DialInfo {
-	return MgoDialInfo(inst.caCert, inst.addr)
+	return MgoDialInfo(inst.certs, inst.addr)
 }
 
 // DialDirect returns a new direct connection to the shared MongoDB server. This
@@ -452,11 +428,11 @@ func (inst *MgoInstance) MustDialDirect() *mgo.Session {
 // MgoDialInfo returns a DialInfo suitable
 // for dialling an MgoInstance at any of the
 // given addresses, optionally using TLS.
-func MgoDialInfo(caCert *x509.Certificate, addrs ...string) *mgo.DialInfo {
+func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 	var dial func(addr net.Addr) (net.Conn, error)
-	if caCert != nil {
+	if certs != nil {
 		pool := x509.NewCertPool()
-		pool.AddCert(caCert)
+		pool.AddCert(certs.CACert)
 		tlsConfig := &tls.Config{
 			RootCAs:    pool,
 			ServerName: "anything",
@@ -494,7 +470,7 @@ func (inst *MgoInstance) Reset() {
 	// If the server has already been destroyed for testing purposes,
 	// just start it again.
 	if inst.Addr() == "" {
-		if err := inst.Start(inst.caCert, inst.caKey); err != nil {
+		if err := inst.Start(inst.certs); err != nil {
 			panic(err)
 		}
 		return
@@ -508,7 +484,7 @@ func (inst *MgoInstance) Reset() {
 		// happen when tests fail.
 		logger.Infof("restarting MongoDB server after unauthorized access")
 		inst.Destroy()
-		if err := inst.Start(inst.caCert, inst.caKey); err != nil {
+		if err := inst.Start(inst.certs); err != nil {
 			panic(err)
 		}
 		return
