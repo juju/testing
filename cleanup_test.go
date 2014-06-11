@@ -29,11 +29,11 @@ func (s *cleanupSuite) TestTearDownTestEmpty(c *gc.C) {
 	s.SetUpTest(c)
 }
 
-func (s *cleanupSuite) TestTearDownTestWithSuiteSetup(c *gc.C) {
+func (s *cleanupSuite) TestTearDownTestWithPatch(c *gc.C) {
 	expSuiteVal := 42
 	expTestVal := 84
 	dest := 0
-	suite := cleanupSuite{}
+	var suite testing.CleanupSuite
 	suite.SetUpSuite(c)
 	suite.PatchValue(&dest, expSuiteVal)
 	c.Assert(dest, gc.Equals, expSuiteVal)
@@ -44,6 +44,15 @@ func (s *cleanupSuite) TestTearDownTestWithSuiteSetup(c *gc.C) {
 	suite.SetUpTest(c)
 	c.Assert(dest, gc.Equals, expSuiteVal)
 	suite.TearDownTest(c)
+}
+
+func (s *cleanupSuite) TestTearDownSuiteWithPatch(c *gc.C) {
+	expSuiteVal := 42
+	dest := 0
+	var suite testing.CleanupSuite
+	suite.SetUpSuite(c)
+	suite.PatchValue(&dest, expSuiteVal)
+	c.Assert(dest, gc.Equals, expSuiteVal)
 	suite.TearDownSuite(c)
 	c.Assert(dest, gc.Equals, 0)
 }

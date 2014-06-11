@@ -18,26 +18,25 @@ type cleanupStack []CleanupFunc
 type CleanupSuite struct {
 	testStack  cleanupStack
 	suiteStack cleanupStack
-	setupSuite bool
+	setUpTest  bool
 }
 
 func (s *CleanupSuite) SetUpSuite(c *gc.C) {
 	s.suiteStack = nil
-	s.setupSuite = true
 }
 
 func (s *CleanupSuite) TearDownSuite(c *gc.C) {
 	s.callStack(c, s.suiteStack)
-	s.setupSuite = false
 }
 
 func (s *CleanupSuite) SetUpTest(c *gc.C) {
-	s.setupSuite = false
+	s.setUpTest = true
 	s.testStack = nil
 }
 
 func (s *CleanupSuite) TearDownTest(c *gc.C) {
 	s.callStack(c, s.testStack)
+	s.setUpTest = false
 }
 
 func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
@@ -49,7 +48,11 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 // AddCleanup pushes the cleanup function onto the stack of functions to be
 // called during TearDownTest.
 func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
-	s.testStack = append(s.testStack, cleanup)
+	if s.setUpTest {
+		s.testStack = append(s.testStack, cleanup)
+	} else {
+		s.suiteStack = append(s.suiteStack, cleanup)
+	}
 }
 
 // AddSuiteCleanup pushes the cleanup function onto the stack of functions to
@@ -63,22 +66,14 @@ func (s *CleanupSuite) AddSuiteCleanup(cleanup CleanupFunc) {
 // down time using a cleanup function.
 func (s *CleanupSuite) PatchEnvironment(name, value string) {
 	restore := PatchEnvironment(name, value)
-	if s.setupSuite {
-		s.AddSuiteCleanup(func(*gc.C) { restore() })
-	} else {
-		s.AddCleanup(func(*gc.C) { restore() })
-	}
+	s.AddCleanup(func(*gc.C) { restore() })
 }
 
 // PatchEnvPathPrepend prepends the given path to the environment $PATH and restores the
 // original path on test teardown.
 func (s *CleanupSuite) PatchEnvPathPrepend(dir string) {
 	restore := PatchEnvPathPrepend(dir)
-	if s.setupSuite {
-		s.AddSuiteCleanup(func(*gc.C) { restore() })
-	} else {
-		s.AddCleanup(func(*gc.C) { restore() })
-	}
+	s.AddCleanup(func(*gc.C) { restore() })
 }
 
 // PatchValue sets the 'dest' variable the the value passed in. The old value
@@ -87,11 +82,7 @@ func (s *CleanupSuite) PatchEnvPathPrepend(dir string) {
 // destination.
 func (s *CleanupSuite) PatchValue(dest, value interface{}) {
 	restore := PatchValue(dest, value)
-	if s.setupSuite {
-		s.AddSuiteCleanup(func(*gc.C) { restore() })
-	} else {
-		s.AddCleanup(func(*gc.C) { restore() })
-	}
+	s.AddCleanup(func(*gc.C) { restore() })
 }
 
 // HookCommandOutput calls the package function of the same name to mock out
