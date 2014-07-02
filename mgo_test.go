@@ -4,6 +4,9 @@
 package testing_test
 
 import (
+	"fmt"
+
+	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	gc "launchpad.net/gocheck"
 
@@ -70,4 +73,12 @@ func (s *mgoSuite) TestStartAndClean(c *gc.C) {
 	err = menu.Find(nil).All(&morefood)
 	c.Assert(err, gc.IsNil)
 	c.Assert(morefood, gc.HasLen, 0)
+}
+
+func (s *mgoSuite) TestStartIPv6(c *gc.C) {
+	info := testing.MgoServer.DialInfo()
+	info.Addrs = []string{fmt.Sprintf("[::1]:%v", testing.MgoServer.Port())}
+	session, err := mgo.DialWithInfo(info)
+	c.Assert(err, gc.IsNil)
+	session.Close()
 }
