@@ -201,6 +201,7 @@ func (inst *MgoInstance) run() error {
 		"--nounixsocket",
 		"--oplogSize", "10",
 		"--keyFile", filepath.Join(inst.dir, "keyfile"),
+		"--ipv6",
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
