@@ -254,10 +254,10 @@ func (inst *MgoInstance) run() error {
 		}
 		// Capture the last 20 lines of output from mongod, to log
 		// in the event of unclean exit.
-		lines, _ := readLastLines(prefix, io.MultiReader(&buf, out), 20)
-		err = server.Wait()
-		exitErr, _ := err.(*exec.ExitError)
-		if err == nil || exitErr != nil && exitErr.Exited() {
+		lines, err1 := readLastLines(prefix, io.MultiReader(&buf, out), 20)
+		err2 := server.Wait()
+		exitErr, _ := err2.(*exec.ExitError)
+		if err1 != nil || err2 == nil || exitErr != nil && exitErr.Exited() {
 			// mongodb has exited without being killed, so print the
 			// last few lines of its log output.
 			logger.Errorf("mongodb has exited without being killed")
