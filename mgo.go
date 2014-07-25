@@ -81,6 +81,9 @@ type MgoInstance struct {
 	// the mongod application
 	Params []string
 
+	// EnableJournal enables journaling.
+	EnableJournal bool
+
 	// WithoutV8 is true if we believe this Mongo doesn't actually have the
 	// V8 engine
 	WithoutV8 bool
@@ -196,12 +199,14 @@ func (inst *MgoInstance) run() error {
 		"--nssize", "1",
 		"--noprealloc",
 		"--smallfiles",
-		"--nojournal",
 		"--nohttpinterface",
 		"--nounixsocket",
 		"--oplogSize", "10",
 		"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		"--ipv6",
+	}
+	if !inst.EnableJournal {
+		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
