@@ -26,8 +26,7 @@ func (s *osEnvSuite) TestOriginalEnvironment(c *gc.C) {
 	err := os.Setenv("TESTING_OSENV_ORIGINAL", "original-value")
 	c.Assert(err, gc.IsNil)
 	s.osEnvSuite.SetUpSuite(c)
-	// The environment is empty.
-	c.Assert(os.Environ(), gc.HasLen, 0)
+	c.Assert(os.Getenv("TESTING_OSENV_ORIGINAL"), gc.Equals, "")
 	s.osEnvSuite.TearDownSuite(c)
 	// The environment has been restored.
 	c.Assert(os.Getenv("TESTING_OSENV_ORIGINAL"), gc.Equals, "original-value")
