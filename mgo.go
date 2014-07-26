@@ -1,5 +1,5 @@
 // Copyright 2012, 2013 Canonical Ltd.
-// Licensed under the AGPLv3, see LICENCE file for details.
+// Licensed under the LGPLv3, see LICENCE file for details.
 
 package testing
 
@@ -201,6 +201,7 @@ func (inst *MgoInstance) run() error {
 		"--nounixsocket",
 		"--oplogSize", "10",
 		"--keyFile", filepath.Join(inst.dir, "keyfile"),
+		"--ipv6",
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,

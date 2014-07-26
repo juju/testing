@@ -156,9 +156,9 @@ func (s *LogMatchesSuite) TestFromLogMatches(c *gc.C) {
 	logger.Infof("foo")
 	logger.Debugf("bar")
 	logger.Tracef("hidden")
-	c.Check(tw.Log, jc.LogMatches, []string{"foo", "bar"})
-	c.Check(tw.Log, gc.Not(jc.LogMatches), []string{"foo", "bad"})
-	c.Check(tw.Log, gc.Not(jc.LogMatches), []jc.SimpleMessage{
+	c.Check(tw.Log(), jc.LogMatches, []string{"foo", "bar"})
+	c.Check(tw.Log(), gc.Not(jc.LogMatches), []string{"foo", "bad"})
+	c.Check(tw.Log(), gc.Not(jc.LogMatches), []jc.SimpleMessage{
 		{loggo.INFO, "foo"},
 		{loggo.INFO, "bar"},
 	})
