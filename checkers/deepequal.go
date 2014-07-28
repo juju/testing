@@ -125,7 +125,7 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 	case reflect.Interface:
 		if v1.IsNil() || v2.IsNil() {
 			if v1.IsNil() != v2.IsNil() {
-				return false, fmt.Errorf("nil vs non-nil interface mismatch")
+				return false, errorf("nil vs non-nil interface mismatch")
 			}
 			return true, nil
 		}
