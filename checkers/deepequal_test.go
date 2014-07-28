@@ -75,6 +75,7 @@ var deepEqualTests = []DeepEqualTest{
 	{1, nil, false, `mismatch at top level: nil vs non-nil mismatch; obtained 1; expected <nil>`},
 	{fn1, fn3, false, `mismatch at top level: non-nil functions; obtained \(func\(\)\)\(nil\); expected \(func\(\)\)\(0x[0-9a-f]+\)`},
 	{fn3, fn3, false, `mismatch at top level: non-nil functions; obtained \(func\(\)\)\(0x[0-9a-f]+\); expected \(func\(\)\)\(0x[0-9a-f]+\)`},
+	{[]interface{}{nil}, []interface{}{"a"}, false, `mismatch at \[0\]: nil vs non-nil interface mismatch`},
 
 	// Nil vs empty: they're the same (difference from normal DeepEqual)
 	{[]int{}, []int(nil), true, ""},
