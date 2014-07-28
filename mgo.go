@@ -25,7 +25,7 @@ import (
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 	gc "launchpad.net/gocheck"
 )
 
@@ -80,6 +80,9 @@ type MgoInstance struct {
 	// Params is a list of additional parameters that will be passed to
 	// the mongod application
 	Params []string
+
+	// EnableJournal enables journaling.
+	EnableJournal bool
 
 	// WithoutV8 is true if we believe this Mongo doesn't actually have the
 	// V8 engine
@@ -196,12 +199,14 @@ func (inst *MgoInstance) run() error {
 		"--nssize", "1",
 		"--noprealloc",
 		"--smallfiles",
-		"--nojournal",
 		"--nohttpinterface",
 		"--nounixsocket",
 		"--oplogSize", "10",
 		"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		"--ipv6",
+	}
+	if !inst.EnableJournal {
+		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
@@ -212,18 +217,14 @@ func (inst *MgoInstance) run() error {
 	if inst.Params != nil {
 		mgoargs = append(mgoargs, inst.Params...)
 	}
-	// Look for mongod first. This is so we can run the V8 tests for the
-	// store
-	mongopath, err := exec.LookPath("mongod")
+	mongopath, err := getMongod()
 	if err != nil {
-		logger.Debugf("failed to find 'mongodb', in PATH, looking for /usr/lib/juju/bin/mongod")
-		mongopath, err = exec.LookPath("/usr/lib/juju/bin/mongod")
-		if err != nil {
-			return err
-		}
-		inst.WithoutV8 = true
+		return err
 	}
 	logger.Debugf("found mongod at: %q", mongopath)
+	if mongopath == "/usr/lib/juju/bin/mongod" {
+		inst.WithoutV8 = true
+	}
 	server := exec.Command(mongopath, mgoargs...)
 	out, err := server.StdoutPipe()
 	if err != nil {
@@ -281,6 +282,23 @@ func (inst *MgoInstance) run() error {
 	inst.server = server
 
 	return nil
+}
+
+func getMongod() (string, error) {
+	paths := []string{"mongod", "/usr/lib/juju/bin/mongod"}
+	if path := os.Getenv("JUJU_MONGOD"); path != "" {
+		paths = append([]string{path}, paths...)
+	}
+	var err error
+	var mongopath string
+	for _, path := range paths {
+		mongopath, err = exec.LookPath(path)
+		if err == nil {
+			return mongopath, nil
+		}
+		logger.Debugf("failed to find %q: %v", path, err)
+	}
+	return "", err
 }
 
 func (inst *MgoInstance) kill(sig os.Signal) {

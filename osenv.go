@@ -60,6 +60,12 @@ var windowsVariables = []string{
 	"windir",
 }
 
+// testingVariables is a whitelist of environment variables
+// used to control Juju tests, that will be retained if found.
+var testingVariables = []string{
+	"JUJU_MONGOD",
+}
+
 func (s *OsEnvSuite) setEnviron() {
 	var envList []string
 	switch runtime.GOOS {
@@ -68,6 +74,7 @@ func (s *OsEnvSuite) setEnviron() {
 	default:
 		envList = []string{}
 	}
+	envList = append(envList, testingVariables...)
 	for _, envVar := range envList {
 		if value, ok := s.oldEnvironment[envVar]; ok {
 			os.Setenv(envVar, value)
