@@ -30,7 +30,9 @@ func MakeFakeHome(c *gc.C) *FakeHome {
 	sshPath := filepath.Join(fakeHome, ".ssh")
 	err := os.Mkdir(sshPath, 0777)
 	c.Assert(err, gc.IsNil)
-	err = ioutil.WriteFile(filepath.Join(sshPath, "id_rsa.pub"), []byte("auth key\n"), 0666)
+	err = ioutil.WriteFile(filepath.Join(sshPath, "id_rsa"), []byte("private auth key\n"), 0600)
+	c.Assert(err, gc.IsNil)
+	err = ioutil.WriteFile(filepath.Join(sshPath, "id_rsa.pub"), []byte("public auth key\n"), 0666)
 	c.Assert(err, gc.IsNil)
 
 	return &FakeHome{
