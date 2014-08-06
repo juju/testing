@@ -48,8 +48,8 @@ const (
 // MgoTestPackage should be called to register the tests for any package
 // that requires a MongoDB server. If certs is non-nil, a secure SSL connection
 // will be used from client to server.
-func MgoTestPackage(t *testing.T, certs *Certs) {
-	if err := MgoServer.Start(certs); err != nil {
+func MgoTestPackage(t *testing.T, certs *Certs, jujuMongod string) {
+	if err := MgoServer.Start(certs, jujuMongod); err != nil {
 		t.Fatal(err)
 	}
 	defer MgoServer.Destroy()
@@ -136,6 +136,9 @@ type MgoInstance struct {
 	// certs holds certificates for the TLS connection.
 	certs *Certs
 
+    // jujuMongod is the path to the juju-built mongod binary.
+    jujuMongod string
+
 	// Params is a list of additional parameters that will be passed to
 	// the mongod application
 	Params []string
@@ -188,7 +191,7 @@ func generatePEM(path string, serverCert *x509.Certificate, serverKey *rsa.Priva
 }
 
 // Start starts a MongoDB server in a temporary directory.
-func (inst *MgoInstance) Start(certs *Certs) error {
+func (inst *MgoInstance) Start(certs *Certs, jujuMongod string) error {
 	dbdir, err := ioutil.TempDir("", "test-mgo")
 	if err != nil {
 		return err
@@ -217,7 +220,7 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 		inst.port = FindTCPPort()
 		inst.addr = fmt.Sprintf("localhost:%d", inst.port)
 		inst.dir = dbdir
-		err = inst.run()
+		err = inst.run(jujuMongod)
 		switch err.(type) {
 		case addrAlreadyInUseError:
 			logger.Debugf("failed to start mongo: %v, trying another port", err)
@@ -233,12 +236,13 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 		}
 		break
 	}
+    inst.jujuMongod = jujuMongod
 	return err
 }
 
 // run runs the MongoDB server at the
 // address and directory already configured.
-func (inst *MgoInstance) run() error {
+func (inst *MgoInstance) run(jujuMongod string) error {
 	if inst.server != nil {
 		panic("mongo server is already running")
 	}
@@ -269,12 +273,12 @@ func (inst *MgoInstance) run() error {
 	if inst.Params != nil {
 		mgoargs = append(mgoargs, inst.Params...)
 	}
-	mongopath, err := getMongod()
+	mongopath, err := getMongod(jujuMongod)
 	if err != nil {
 		return err
 	}
 	logger.Debugf("found mongod at: %q", mongopath)
-	if mongopath == "/usr/lib/juju/bin/mongod" {
+	if mongopath == jujuMongod {
 		inst.WithoutV8 = true
 	}
 	server := exec.Command(mongopath, mgoargs...)
@@ -336,8 +340,8 @@ func (inst *MgoInstance) run() error {
 	return nil
 }
 
-func getMongod() (string, error) {
-	paths := []string{"mongod", "/usr/lib/juju/bin/mongod"}
+func getMongod(jujuMongod string) (string, error) {
+	paths := []string{"mongod", jujuMongod}
 	if path := os.Getenv("JUJU_MONGOD"); path != "" {
 		paths = append([]string{path}, paths...)
 	}
@@ -385,7 +389,7 @@ func (inst *MgoInstance) DestroyWithLog() {
 func (inst *MgoInstance) Restart() {
 	logger.Debugf("restarting mongod pid %d in %s on port %d", inst.server.Process.Pid, inst.dir, inst.port)
 	inst.kill(os.Kill)
-	if err := inst.Start(inst.certs); err != nil {
+	if err := inst.Start(inst.certs, inst.jujuMongod); err != nil {
 		panic(err)
 	}
 }
@@ -510,7 +514,7 @@ func (inst *MgoInstance) Reset() {
 	// If the server has already been destroyed for testing purposes,
 	// just start it again.
 	if inst.Addr() == "" {
-		if err := inst.Start(inst.certs); err != nil {
+		if err := inst.Start(inst.certs, inst.jujuMongod); err != nil {
 			panic(err)
 		}
 		return
@@ -524,7 +528,7 @@ func (inst *MgoInstance) Reset() {
 		// happen when tests fail.
 		logger.Infof("restarting MongoDB server after unauthorized access")
 		inst.Destroy()
-		if err := inst.Start(inst.certs); err != nil {
+		if err := inst.Start(inst.certs, inst.jujuMongod); err != nil {
 			panic(err)
 		}
 		return
