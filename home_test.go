@@ -47,8 +47,10 @@ func (s *fakeHomeSuite) TestSshDirSetUp(c *gc.C) {
 	s.fakeHomeSuite.SetUpTest(c)
 	sshDir := testing.HomePath(".ssh")
 	c.Assert(sshDir, jc.IsDirectory)
-	keyFile := filepath.Join(sshDir, "id_rsa.pub")
-	c.Assert(keyFile, jc.IsNonEmptyFile)
+	PrivKeyFile := filepath.Join(sshDir, "id_rsa")
+	c.Assert(PrivKeyFile, jc.IsNonEmptyFile)
+	PubKeyFile := filepath.Join(sshDir, "id_rsa.pub")
+	c.Assert(PubKeyFile, jc.IsNonEmptyFile)
 	s.fakeHomeSuite.TearDownTest(c)
 }
 
