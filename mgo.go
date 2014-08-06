@@ -45,6 +45,65 @@ const (
 	DefaultMongoPassword = "conn-from-name-secret"
 )
 
+// MgoTestPackage should be called to register the tests for any package
+// that requires a MongoDB server. If certs is non-nil, a secure SSL connection
+// will be used from client to server.
+func MgoTestPackage(t *testing.T, certs *Certs) {
+	if err := MgoServer.Start(certs); err != nil {
+		t.Fatal(err)
+	}
+	defer MgoServer.Destroy()
+	gc.TestingT(t)
+}
+
+//---------------------------
+// test suite
+
+// MgoSuite is a suite that deletes all content from the shared MongoDB
+// server at the end of every test and supplies a connection to the shared
+// MongoDB server.
+type MgoSuite struct {
+	Session *mgo.Session
+}
+
+func (s *MgoSuite) SetUpSuite(c *gc.C) {
+	if MgoServer.addr == "" {
+		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
+	}
+	mgo.SetStats(true)
+	// Make tests that use password authentication faster.
+	utils.FastInsecureHash = true
+}
+
+func (s *MgoSuite) TearDownSuite(c *gc.C) {
+	utils.FastInsecureHash = false
+}
+
+func (s *MgoSuite) SetUpTest(c *gc.C) {
+	mgo.ResetStats()
+	s.Session = MgoServer.MustDial()
+	dropAll(s.Session)
+}
+
+func (s *MgoSuite) TearDownTest(c *gc.C) {
+	MgoServer.Reset()
+	s.Session.Close()
+	for i := 0; ; i++ {
+		stats := mgo.GetStats()
+		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
+			break
+		}
+		if i == 20 {
+			c.Fatal("Test left sockets in a dirty state")
+		}
+		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+//---------------------------
+// server wrapper
+
 // Certs holds the certificates and keys required to make a secure
 // SSL connection.
 type Certs struct {
@@ -102,13 +161,6 @@ func (m *MgoInstance) Port() int {
 // We specify a timeout to mgo.Dial, to prevent
 // mongod failures hanging the tests.
 const mgoDialTimeout = 60 * time.Second
-
-// MgoSuite is a suite that deletes all content from the shared MongoDB
-// server at the end of every test and supplies a connection to the shared
-// MongoDB server.
-type MgoSuite struct {
-	Session *mgo.Session
-}
 
 // generatePEM receives server certificate and the server private key
 // and creates a PEM file in the given path.
@@ -338,26 +390,6 @@ func (inst *MgoInstance) Restart() {
 	}
 }
 
-// MgoTestPackage should be called to register the tests for any package
-// that requires a MongoDB server. If certs is non-nil, a secure SSL connection
-// will be used from client to server.
-func MgoTestPackage(t *testing.T, certs *Certs) {
-	if err := MgoServer.Start(certs); err != nil {
-		t.Fatal(err)
-	}
-	defer MgoServer.Destroy()
-	gc.TestingT(t)
-}
-
-func (s *MgoSuite) SetUpSuite(c *gc.C) {
-	if MgoServer.addr == "" {
-		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
-	}
-	mgo.SetStats(true)
-	// Make tests that use password authentication faster.
-	utils.FastInsecureHash = true
-}
-
 // readUntilMatching reads lines from the given reader until the reader
 // is depleted or a line matches the given regular expression.
 func readUntilMatching(prefix string, r io.Reader, re *regexp.Regexp) bool {
@@ -398,10 +430,6 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 		}
 	}
 	return final
-}
-
-func (s *MgoSuite) TearDownSuite(c *gc.C) {
-	utils.FastInsecureHash = false
 }
 
 // MustDial returns a new connection to the MongoDB server, and panics on
@@ -474,12 +502,6 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 		}
 	}
 	return &mgo.DialInfo{Addrs: addrs, Dial: dial, Timeout: mgoDialTimeout}
-}
-
-func (s *MgoSuite) SetUpTest(c *gc.C) {
-	mgo.ResetStats()
-	s.Session = MgoServer.MustDial()
-	dropAll(s.Session)
 }
 
 // Reset deletes all content from the MongoDB server and panics if it encounters
@@ -595,22 +617,6 @@ func isUnauthorized(err error) bool {
 			err.Message == "unauthorized"
 	}
 	return false
-}
-
-func (s *MgoSuite) TearDownTest(c *gc.C) {
-	MgoServer.Reset()
-	s.Session.Close()
-	for i := 0; ; i++ {
-		stats := mgo.GetStats()
-		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
-			break
-		}
-		if i == 20 {
-			c.Fatal("Test left sockets in a dirty state")
-		}
-		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
-		time.Sleep(500 * time.Millisecond)
-	}
 }
 
 // FindTCPPort finds an unused TCP port and returns it.
