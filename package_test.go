@@ -10,5 +10,5 @@ import (
 )
 
 func Test(t *stdtesting.T) {
-	testing.MgoTestPackage(t, nil)
+	testing.MgoTestPackage(t, nil, "/usr/lib/juju/bin/mongod")
 }

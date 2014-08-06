@@ -45,6 +45,65 @@ const (
 	DefaultMongoPassword = "conn-from-name-secret"
 )
 
+// MgoTestPackage should be called to register the tests for any package
+// that requires a MongoDB server. If certs is non-nil, a secure SSL connection
+// will be used from client to server.
+func MgoTestPackage(t *testing.T, certs *Certs, jujuMongod string) {
+	if err := MgoServer.Start(certs, jujuMongod); err != nil {
+		t.Fatal(err)
+	}
+	defer MgoServer.Destroy()
+	gc.TestingT(t)
+}
+
+//---------------------------
+// test suite
+
+// MgoSuite is a suite that deletes all content from the shared MongoDB
+// server at the end of every test and supplies a connection to the shared
+// MongoDB server.
+type MgoSuite struct {
+	Session *mgo.Session
+}
+
+func (s *MgoSuite) SetUpSuite(c *gc.C) {
+	if MgoServer.addr == "" {
+		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
+	}
+	mgo.SetStats(true)
+	// Make tests that use password authentication faster.
+	utils.FastInsecureHash = true
+}
+
+func (s *MgoSuite) TearDownSuite(c *gc.C) {
+	utils.FastInsecureHash = false
+}
+
+func (s *MgoSuite) SetUpTest(c *gc.C) {
+	mgo.ResetStats()
+	s.Session = MgoServer.MustDial()
+	dropAll(s.Session)
+}
+
+func (s *MgoSuite) TearDownTest(c *gc.C) {
+	MgoServer.Reset()
+	s.Session.Close()
+	for i := 0; ; i++ {
+		stats := mgo.GetStats()
+		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
+			break
+		}
+		if i == 20 {
+			c.Fatal("Test left sockets in a dirty state")
+		}
+		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+//---------------------------
+// server wrapper
+
 // Certs holds the certificates and keys required to make a secure
 // SSL connection.
 type Certs struct {
@@ -77,6 +136,9 @@ type MgoInstance struct {
 	// certs holds certificates for the TLS connection.
 	certs *Certs
 
+    // jujuMongod is the path to the juju-built mongod binary.
+    jujuMongod string
+
 	// Params is a list of additional parameters that will be passed to
 	// the mongod application
 	Params []string
@@ -102,13 +164,6 @@ func (m *MgoInstance) Port() int {
 // We specify a timeout to mgo.Dial, to prevent
 // mongod failures hanging the tests.
 const mgoDialTimeout = 60 * time.Second
-
-// MgoSuite is a suite that deletes all content from the shared MongoDB
-// server at the end of every test and supplies a connection to the shared
-// MongoDB server.
-type MgoSuite struct {
-	Session *mgo.Session
-}
 
 // generatePEM receives server certificate and the server private key
 // and creates a PEM file in the given path.
@@ -136,7 +191,7 @@ func generatePEM(path string, serverCert *x509.Certificate, serverKey *rsa.Priva
 }
 
 // Start starts a MongoDB server in a temporary directory.
-func (inst *MgoInstance) Start(certs *Certs) error {
+func (inst *MgoInstance) Start(certs *Certs, jujuMongod string) error {
 	dbdir, err := ioutil.TempDir("", "test-mgo")
 	if err != nil {
 		return err
@@ -165,7 +220,7 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 		inst.port = FindTCPPort()
 		inst.addr = fmt.Sprintf("localhost:%d", inst.port)
 		inst.dir = dbdir
-		err = inst.run()
+		err = inst.run(jujuMongod)
 		switch err.(type) {
 		case addrAlreadyInUseError:
 			logger.Debugf("failed to start mongo: %v, trying another port", err)
@@ -181,12 +236,13 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 		}
 		break
 	}
+    inst.jujuMongod = jujuMongod
 	return err
 }
 
 // run runs the MongoDB server at the
 // address and directory already configured.
-func (inst *MgoInstance) run() error {
+func (inst *MgoInstance) run(jujuMongod string) error {
 	if inst.server != nil {
 		panic("mongo server is already running")
 	}
@@ -217,12 +273,12 @@ func (inst *MgoInstance) run() error {
 	if inst.Params != nil {
 		mgoargs = append(mgoargs, inst.Params...)
 	}
-	mongopath, err := getMongod()
+	mongopath, err := getMongod(jujuMongod)
 	if err != nil {
 		return err
 	}
 	logger.Debugf("found mongod at: %q", mongopath)
-	if mongopath == "/usr/lib/juju/bin/mongod" {
+	if mongopath == jujuMongod {
 		inst.WithoutV8 = true
 	}
 	server := exec.Command(mongopath, mgoargs...)
@@ -284,8 +340,8 @@ func (inst *MgoInstance) run() error {
 	return nil
 }
 
-func getMongod() (string, error) {
-	paths := []string{"mongod", "/usr/lib/juju/bin/mongod"}
+func getMongod(jujuMongod string) (string, error) {
+	paths := []string{"mongod", jujuMongod}
 	if path := os.Getenv("JUJU_MONGOD"); path != "" {
 		paths = append([]string{path}, paths...)
 	}
@@ -333,29 +389,9 @@ func (inst *MgoInstance) DestroyWithLog() {
 func (inst *MgoInstance) Restart() {
 	logger.Debugf("restarting mongod pid %d in %s on port %d", inst.server.Process.Pid, inst.dir, inst.port)
 	inst.kill(os.Kill)
-	if err := inst.Start(inst.certs); err != nil {
+	if err := inst.Start(inst.certs, inst.jujuMongod); err != nil {
 		panic(err)
 	}
-}
-
-// MgoTestPackage should be called to register the tests for any package
-// that requires a MongoDB server. If certs is non-nil, a secure SSL connection
-// will be used from client to server.
-func MgoTestPackage(t *testing.T, certs *Certs) {
-	if err := MgoServer.Start(certs); err != nil {
-		t.Fatal(err)
-	}
-	defer MgoServer.Destroy()
-	gc.TestingT(t)
-}
-
-func (s *MgoSuite) SetUpSuite(c *gc.C) {
-	if MgoServer.addr == "" {
-		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
-	}
-	mgo.SetStats(true)
-	// Make tests that use password authentication faster.
-	utils.FastInsecureHash = true
 }
 
 // readUntilMatching reads lines from the given reader until the reader
@@ -398,10 +434,6 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 		}
 	}
 	return final
-}
-
-func (s *MgoSuite) TearDownSuite(c *gc.C) {
-	utils.FastInsecureHash = false
 }
 
 // MustDial returns a new connection to the MongoDB server, and panics on
@@ -476,19 +508,13 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 	return &mgo.DialInfo{Addrs: addrs, Dial: dial, Timeout: mgoDialTimeout}
 }
 
-func (s *MgoSuite) SetUpTest(c *gc.C) {
-	mgo.ResetStats()
-	s.Session = MgoServer.MustDial()
-	dropAll(s.Session)
-}
-
 // Reset deletes all content from the MongoDB server and panics if it encounters
 // errors.
 func (inst *MgoInstance) Reset() {
 	// If the server has already been destroyed for testing purposes,
 	// just start it again.
 	if inst.Addr() == "" {
-		if err := inst.Start(inst.certs); err != nil {
+		if err := inst.Start(inst.certs, inst.jujuMongod); err != nil {
 			panic(err)
 		}
 		return
@@ -502,7 +528,7 @@ func (inst *MgoInstance) Reset() {
 		// happen when tests fail.
 		logger.Infof("restarting MongoDB server after unauthorized access")
 		inst.Destroy()
-		if err := inst.Start(inst.certs); err != nil {
+		if err := inst.Start(inst.certs, inst.jujuMongod); err != nil {
 			panic(err)
 		}
 		return
@@ -595,22 +621,6 @@ func isUnauthorized(err error) bool {
 			err.Message == "unauthorized"
 	}
 	return false
-}
-
-func (s *MgoSuite) TearDownTest(c *gc.C) {
-	MgoServer.Reset()
-	s.Session.Close()
-	for i := 0; ; i++ {
-		stats := mgo.GetStats()
-		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
-			break
-		}
-		if i == 20 {
-			c.Fatal("Test left sockets in a dirty state")
-		}
-		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
-		time.Sleep(500 * time.Millisecond)
-	}
 }
 
 // FindTCPPort finds an unused TCP port and returns it.
