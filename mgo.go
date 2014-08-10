@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -202,9 +203,11 @@ func (inst *MgoInstance) run() error {
 		"--noprealloc",
 		"--smallfiles",
 		"--nohttpinterface",
-		"--nounixsocket",
 		"--oplogSize", "10",
 		"--ipv6",
+	}
+	if runtime.GOOS != "windows" {
+		mgoargs = append(mgoargs, "--nounixsocket")
 	}
 	if inst.EnableAuth {
 		mgoargs = append(mgoargs,
