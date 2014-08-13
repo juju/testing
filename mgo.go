@@ -84,6 +84,9 @@ type MgoInstance struct {
 	// EnableJournal enables journaling.
 	EnableJournal bool
 
+	// EnableAuth enables authentication/authorization.
+	EnableAuth bool
+
 	// WithoutV8 is true if we believe this Mongo doesn't actually have the
 	// V8 engine
 	WithoutV8 bool
@@ -193,7 +196,6 @@ func (inst *MgoInstance) run() error {
 
 	mgoport := strconv.Itoa(inst.port)
 	mgoargs := []string{
-		"--auth",
 		"--dbpath", inst.dir,
 		"--port", mgoport,
 		"--nssize", "1",
@@ -202,8 +204,13 @@ func (inst *MgoInstance) run() error {
 		"--nohttpinterface",
 		"--nounixsocket",
 		"--oplogSize", "10",
-		"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		"--ipv6",
+	}
+	if inst.EnableAuth {
+		mgoargs = append(mgoargs,
+			"--auth",
+			"--keyFile", filepath.Join(inst.dir, "keyfile"),
+		)
 	}
 	if !inst.EnableJournal {
 		mgoargs = append(mgoargs, "--nojournal")
