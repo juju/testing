@@ -6,6 +6,7 @@ package testing_test
 import (
 	"io/ioutil"
 	"path/filepath"
+	"runtime"
 
 	"github.com/juju/utils"
 	gc "launchpad.net/gocheck"
@@ -39,7 +40,12 @@ func (s *fakeHomeSuite) TestHomeCreated(c *gc.C) {
 	c.Assert(home, jc.IsDirectory)
 	s.fakeHomeSuite.TearDownTest(c)
 	// The original home has been restored.
-	c.Assert(utils.Home(), gc.Equals, "/tmp/tests")
+	switch runtime.GOOS {
+	case "windows":
+		c.Assert(utils.Home(), gc.Equals, "C:/tmp/tests")
+	default:
+		c.Assert(utils.Home(), gc.Equals, "/tmp/tests")
+	}
 }
 
 func (s *fakeHomeSuite) TestSshDirSetUp(c *gc.C) {
