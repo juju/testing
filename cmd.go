@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	gc "launchpad.net/gocheck"
 )
@@ -38,7 +39,7 @@ func HookCommandOutput(
 const (
 	// EchoQuotedArgs is a simple bash script that prints out the
 	// basename of the command followed by the args as quoted strings.
-	EchoQuotedArgs = `#!/bin/bash --norc
+	EchoQuotedArgsUnix = `#!/bin/bash --norc
 name=` + "`basename $0`" + `
 argfile="$name.out"
 rm -f $argfile
@@ -47,6 +48,21 @@ for arg in "$@"; do
   printf " \"%s\""  "$arg" | tee -a $argfile
 done
 printf "\n" | tee -a $argfile
+`
+	EchoQuotedArgsWindows = `@echo off
+
+setlocal enabledelayedexpansion
+set list=%0
+set argCount=0
+for %%x in (%*) do (
+   set /A argCount+=1
+   set "argVec[!argCount!]=%%~x"
+)
+
+for /L %%i in (1,1,%argCount%) do set list=!list! "!argVec[%%i]!"
+
+echo %list%
+echo %list%> %0.out
 `
 )
 
@@ -61,7 +77,13 @@ type EnvironmentPatcher interface {
 func PatchExecutable(c *gc.C, patcher EnvironmentPatcher, execName, script string) {
 	dir := c.MkDir()
 	patcher.PatchEnvironment("PATH", joinPathLists(dir, os.Getenv("PATH")))
-	filename := filepath.Join(dir, execName)
+	var filename string
+	switch runtime.GOOS {
+	case "windows":
+		filename = filepath.Join(dir, execName+".bat")
+	default:
+		filename = filepath.Join(dir, execName)
+	}
 	err := ioutil.WriteFile(filename, []byte(script), 0755)
 	c.Assert(err, gc.IsNil)
 }
@@ -71,12 +93,42 @@ type CleanupPatcher interface {
 	AddCleanup(cleanup CleanupFunc)
 }
 
+// PatchExecutableThrowError is needed to test cases in which we expect exit
+// codes from executables called from the system path
+func PatchExecutableThrowError(c *gc.C, patcher CleanupPatcher, execName string, exitCode int) {
+	switch runtime.GOOS {
+	case "windows":
+		script := fmt.Sprintf(`@echo off
+		                       setlocal enabledelayedexpansion
+                               echo failing
+                               exit /b %d
+                               REM see %ERRORLEVEL% for last exit code like $? on linux
+                               `, exitCode)
+		PatchExecutable(c, patcher, execName, script)
+	default:
+		script := fmt.Sprintf(`#!/bin/bash --norc
+                               echo failing
+                               exit %d
+                               `, exitCode)
+		PatchExecutable(c, patcher, execName, script)
+	}
+	patcher.AddCleanup(func(*gc.C) {
+		os.Remove(execName + ".out")
+	})
+
+}
+
 // PatchExecutableAsEchoArgs creates an executable called 'execName' in a new
 // test directory and that directory is added to the path. The content of the
 // script is 'EchoQuotedArgs', and the args file is removed using a cleanup
 // function.
 func PatchExecutableAsEchoArgs(c *gc.C, patcher CleanupPatcher, execName string) {
-	PatchExecutable(c, patcher, execName, EchoQuotedArgs)
+	switch runtime.GOOS {
+	case "windows":
+		PatchExecutable(c, patcher, execName, EchoQuotedArgsWindows)
+	default:
+		PatchExecutable(c, patcher, execName, EchoQuotedArgsUnix)
+	}
 	patcher.AddCleanup(func(*gc.C) {
 		os.Remove(execName + ".out")
 	})
@@ -91,6 +143,11 @@ func AssertEchoArgs(c *gc.C, execName string, args ...string) {
 	for _, arg := range args {
 		expected = fmt.Sprintf("%s %q", expected, arg)
 	}
-	expected += "\n"
+	switch runtime.GOOS {
+	case "windows":
+		expected += "\r\n"
+	default:
+		expected += "\n"
+	}
 	c.Assert(string(content), gc.Equals, expected)
 }

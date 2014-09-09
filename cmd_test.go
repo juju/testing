@@ -5,6 +5,7 @@ package testing_test
 
 import (
 	"os/exec"
+	"runtime"
 
 	gc "launchpad.net/gocheck"
 
@@ -44,7 +45,12 @@ func (s *cmdSuite) TestPatchExecutableNoArgs(c *gc.C) {
 	s.EnsureArgFileRemoved(testFunc)
 	testing.PatchExecutableAsEchoArgs(c, s, testFunc)
 	output := runCommand(c, testFunc)
-	c.Assert(output, gc.Equals, testFunc+"\n")
+	switch runtime.GOOS {
+	case "windows":
+		c.Assert(output, gc.Equals, testFunc+"\r\n")
+	default:
+		c.Assert(output, gc.Equals, testFunc+"\n")
+	}
 	testing.AssertEchoArgs(c, testFunc)
 }
 
@@ -52,8 +58,26 @@ func (s *cmdSuite) TestPatchExecutableWithArgs(c *gc.C) {
 	s.EnsureArgFileRemoved(testFunc)
 	testing.PatchExecutableAsEchoArgs(c, s, testFunc)
 	output := runCommand(c, testFunc, "foo", "bar baz")
-	c.Assert(output, gc.Equals, testFunc+" \"foo\" \"bar baz\"\n")
+	switch runtime.GOOS {
+	case "windows":
+		c.Assert(output, gc.Equals, testFunc+" \"foo\" \"bar baz\"\r\n")
+	default:
+		c.Assert(output, gc.Equals, testFunc+" \"foo\" \"bar baz\"\n")
+	}
 	testing.AssertEchoArgs(c, testFunc, "foo", "bar baz")
+}
+
+func (s *cmdSuite) TestPatchExecutableThrowError(c *gc.C) {
+	testing.PatchExecutableThrowError(c, s, testFunc, 1)
+	cmd := exec.Command(testFunc)
+	out, err := cmd.CombinedOutput()
+	c.Assert(err, gc.ErrorMatches, "exit status 1")
+	switch runtime.GOOS {
+	case "windows":
+		c.Assert(string(out), gc.Equals, "failing\r\n")
+	default:
+		c.Assert(string(out), gc.Equals, "failing\n")
+	}
 }
 
 func runCommand(c *gc.C, command string, args ...string) string {
