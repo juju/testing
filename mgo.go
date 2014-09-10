@@ -619,7 +619,7 @@ func (s *MgoSuite) TearDownTest(c *gc.C) {
 // We hope that the probability is small enough during
 // testing to be negligible.
 func FindTCPPort() int {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		panic(err)
 	}
