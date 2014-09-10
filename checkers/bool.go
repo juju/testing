@@ -1,4 +1,4 @@
-// Copyright 2013 Canonical Ltd.
+// Copyright 2011 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
 package checkers
@@ -27,7 +27,9 @@ var IsFalse gc.Checker = gc.Not(IsTrue)
 func (checker *isTrueChecker) Check(params []interface{}, names []string) (result bool, error string) {
 
 	value := reflect.ValueOf(params[0])
-
+	if !value.IsValid() {
+		return false, fmt.Sprintf("expected type bool, received %s", value)
+	}
 	switch value.Kind() {
 	case reflect.Bool:
 		return value.Bool(), ""

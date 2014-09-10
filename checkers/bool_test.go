@@ -31,11 +31,15 @@ func (s *BoolSuite) TestIsTrue(c *gc.C) {
 	result, msg = jc.IsTrue.Check([]interface{}{42}, nil)
 	c.Assert(result, gc.Equals, false)
 	c.Assert(msg, gc.Equals, `expected type bool, received type int`)
+
+	result, msg = jc.IsTrue.Check([]interface{}{nil}, nil)
+	c.Assert(result, gc.Equals, false)
+	c.Assert(msg, gc.Equals, `expected type bool, received <invalid Value>`)
 }
 
 func (s *BoolSuite) TestIsFalse(c *gc.C) {
-	c.Assert(false, jc.IsFalse)
-	c.Assert(true, gc.Not(jc.IsFalse))
+	c.Check(false, jc.IsFalse)
+	c.Check(true, gc.Not(jc.IsFalse))
 }
 
 func is42(i int) bool {
