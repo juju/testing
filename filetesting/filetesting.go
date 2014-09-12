@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	jc "github.com/juju/testing/checkers"
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 )
 
 // Entry represents a filesystem entity that can be created; and whose

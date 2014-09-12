@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 )
 
 type isTrueChecker struct {

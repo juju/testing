@@ -6,7 +6,7 @@ package testing
 import (
 	"os/exec"
 
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 )
 
 type CleanupFunc func(*gc.C)
