@@ -4,7 +4,7 @@
 package checkers_test
 
 import (
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 
 	jc "github.com/juju/testing/checkers"
 )

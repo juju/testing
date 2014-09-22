@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/juju/loggo"
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 )
 
 type SimpleMessage struct {

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"os"
 
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 
 	"github.com/juju/testing"
 )

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 )
 
 func TimeBetween(start, end time.Time) gc.Checker {

@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	gc "launchpad.net/gocheck"
+	gc "gopkg.in/check.v1"
 )
 
 // OsEnvSuite isolates the tests from the underlaying system environment.
