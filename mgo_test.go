@@ -6,9 +6,9 @@ package testing_test
 import (
 	"fmt"
 
+	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	gc "gopkg.in/check.v1"
 
 	"github.com/juju/testing"
 )

@@ -26,8 +26,8 @@ import (
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
-	"gopkg.in/mgo.v2"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/mgo.v2"
 )
 
 var (
