@@ -243,6 +243,8 @@ func DeepEqual(a1, a2 interface{}) (bool, error) {
 // interfaceOf returns v.Interface() even if v.CanInterface() == false.
 // This enables us to call fmt.Printf on a value even if it's derived
 // from inside an unexported field.
+// See https://code.google.com/p/go/issues/detail?id=8965
+// for a possible future alternative to this hack.
 func interfaceOf(v reflect.Value) interface{} {
 	if !v.IsValid() {
 		return nil
@@ -252,9 +254,15 @@ func interfaceOf(v reflect.Value) interface{} {
 
 type flag uintptr
 
-// copied from reflect/value.go
+var flagRO flag
+
+// constants copied from reflect/value.go
 const (
-	flagRO flag = 1 << iota
+	// The value of flagRO up to and including Go 1.3.
+	flagRO1p3 = 1 << 0
+
+	// The value of flagRO from Go 1.4.
+	flagRO1p4 = 1 << 5
 )
 
 var flagValOffset = func() uintptr {
@@ -297,7 +305,11 @@ func init() {
 	va := reflect.ValueOf(t).FieldByName("a")
 	flagA := *flagField(&vA)
 	flaga := *flagField(&va)
-	if flagA&flagRO != 0 || flaga&flagRO == 0 {
-		panic("reflect.Value read-only flag has changed value")
+
+	// Infer flagRO from the difference between the flags
+	// for the (otherwise identical) fields in t.
+	flagRO = flagA ^ flaga
+	if flagRO != flagRO1p3 && flagRO != flagRO1p4 {
+		panic("reflect.Value read-only flag has changed semantics")
 	}
 }
