@@ -40,38 +40,30 @@ func (s *CheckerSuite) TestTimeBetween(c *gc.C) {
 	earlier := now.Add(-1 * time.Second)
 	later := now.Add(time.Second)
 
-	check := func(value interface{}, start, end time.Time) (bool, string) {
+	checkOK := func(value interface{}, start, end time.Time) {
 		checker := jc.TimeBetween(start, end)
-		return checker.Check([]interface{}{value}, nil)
+		value, msg := checker.Check([]interface{}{value}, nil)
+		c.Check(value, jc.IsTrue)
+		c.Check(msg, gc.Equals, "")
 	}
 
-	value, msg := check(now, earlier, later)
-	c.Assert(value, jc.IsTrue)
-	c.Assert(msg, gc.Equals, "")
+	checkFails := func(value interface{}, start, end time.Time, match string) {
+		checker := jc.TimeBetween(start, end)
+		value, msg := checker.Check([]interface{}{value}, nil)
+		c.Check(value, jc.IsFalse)
+		c.Check(msg, gc.Matches, match)
+	}
+
+	checkOK(now, earlier, later)
 	// Later can be before earlier...
-	value, msg = check(now, later, earlier)
-	c.Assert(value, jc.IsTrue)
-	c.Assert(msg, gc.Equals, "")
+	checkOK(now, later, earlier)
+	// check at bounds
+	checkOK(earlier, earlier, later)
+	checkOK(later, earlier, later)
 
-	value, msg = check(earlier, now, later)
-	c.Assert(value, jc.IsFalse)
-	c.Assert(msg, gc.Matches, `obtained time .* is before start time .*`)
-
-	value, msg = check(later, now, earlier)
-	c.Assert(value, jc.IsFalse)
-	c.Assert(msg, gc.Matches, `obtained time .* is after end time .*`)
-
-	value, msg = check(42, now, earlier)
-	c.Assert(value, jc.IsFalse)
-	c.Assert(msg, gc.Matches, `obtained value type must be time.Time`)
-
-	// equality checking
-	value, msg = check(earlier, earlier, later)
-	c.Assert(value, jc.IsTrue)
-	c.Assert(msg, gc.Equals, "")
-	value, msg = check(later, earlier, later)
-	c.Assert(value, jc.IsTrue)
-	c.Assert(msg, gc.Equals, "")
+	checkFails(earlier, now, later, `obtained time .* is before start time .*`)
+	checkFails(later, now, earlier, `obtained time .* is after end time .*`)
+	checkFails(42, now, earlier, `obtained value type must be time.Time`)
 }
 
 func (s *CheckerSuite) TestSameContents(c *gc.C) {
