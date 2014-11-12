@@ -5,6 +5,7 @@ package checkers_test
 
 import (
 	"testing"
+	"time"
 
 	gc "gopkg.in/check.v1"
 
@@ -32,6 +33,45 @@ func (s *CheckerSuite) TestContains(c *gc.C) {
 	c.Assert("foo bar baz", jc.Contains, "bar")
 	c.Assert("foo bar baz", jc.Contains, "baz")
 	c.Assert("foo bar baz", gc.Not(jc.Contains), "omg")
+}
+
+func (s *CheckerSuite) TestTimeBetween(c *gc.C) {
+	now := time.Now()
+	earlier := now.Add(-1 * time.Second)
+	later := now.Add(time.Second)
+
+	check := func(value interface{}, start, end time.Time) (bool, string) {
+		checker := jc.TimeBetween(start, end)
+		return checker.Check([]interface{}{value}, nil)
+	}
+
+	value, msg := check(now, earlier, later)
+	c.Assert(value, jc.IsTrue)
+	c.Assert(msg, gc.Equals, "")
+	// Later can be before earlier...
+	value, msg = check(now, later, earlier)
+	c.Assert(value, jc.IsTrue)
+	c.Assert(msg, gc.Equals, "")
+
+	value, msg = check(earlier, now, later)
+	c.Assert(value, jc.IsFalse)
+	c.Assert(msg, gc.Matches, `obtained time .* is before start time .*`)
+
+	value, msg = check(later, now, earlier)
+	c.Assert(value, jc.IsFalse)
+	c.Assert(msg, gc.Matches, `obtained time .* is after end time .*`)
+
+	value, msg = check(42, now, earlier)
+	c.Assert(value, jc.IsFalse)
+	c.Assert(msg, gc.Matches, `obtained value type must be time.Time`)
+
+	// equality checking
+	value, msg = check(earlier, earlier, later)
+	c.Assert(value, jc.IsTrue)
+	c.Assert(msg, gc.Equals, "")
+	value, msg = check(later, earlier, later)
+	c.Assert(value, jc.IsTrue)
+	c.Assert(msg, gc.Equals, "")
 }
 
 func (s *CheckerSuite) TestSameContents(c *gc.C) {
