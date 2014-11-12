@@ -5,6 +5,7 @@ package checkers_test
 
 import (
 	"testing"
+	"time"
 
 	gc "gopkg.in/check.v1"
 
@@ -32,6 +33,37 @@ func (s *CheckerSuite) TestContains(c *gc.C) {
 	c.Assert("foo bar baz", jc.Contains, "bar")
 	c.Assert("foo bar baz", jc.Contains, "baz")
 	c.Assert("foo bar baz", gc.Not(jc.Contains), "omg")
+}
+
+func (s *CheckerSuite) TestTimeBetween(c *gc.C) {
+	now := time.Now()
+	earlier := now.Add(-1 * time.Second)
+	later := now.Add(time.Second)
+
+	checkOK := func(value interface{}, start, end time.Time) {
+		checker := jc.TimeBetween(start, end)
+		value, msg := checker.Check([]interface{}{value}, nil)
+		c.Check(value, jc.IsTrue)
+		c.Check(msg, gc.Equals, "")
+	}
+
+	checkFails := func(value interface{}, start, end time.Time, match string) {
+		checker := jc.TimeBetween(start, end)
+		value, msg := checker.Check([]interface{}{value}, nil)
+		c.Check(value, jc.IsFalse)
+		c.Check(msg, gc.Matches, match)
+	}
+
+	checkOK(now, earlier, later)
+	// Later can be before earlier...
+	checkOK(now, later, earlier)
+	// check at bounds
+	checkOK(earlier, earlier, later)
+	checkOK(later, earlier, later)
+
+	checkFails(earlier, now, later, `obtained time .* is before start time .*`)
+	checkFails(later, now, earlier, `obtained time .* is after end time .*`)
+	checkFails(42, now, earlier, `obtained value type must be time.Time`)
 }
 
 func (s *CheckerSuite) TestSameContents(c *gc.C) {

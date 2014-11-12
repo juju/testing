@@ -37,10 +37,10 @@ func (checker *timeBetweenChecker) Check(params []interface{}, names []string) (
 		return false, "obtained value type must be time.Time"
 	}
 	if when.Before(checker.start) {
-		return false, fmt.Sprintf("obtained value %#v type must before start value of %#v", when, checker.start)
+		return false, fmt.Sprintf("obtained time %q is before start time %q", when, checker.start)
 	}
 	if when.After(checker.end) {
-		return false, fmt.Sprintf("obtained value %#v type must after end value of %#v", when, checker.end)
+		return false, fmt.Sprintf("obtained time %q is after end time %q", when, checker.end)
 	}
 	return true, ""
 }
