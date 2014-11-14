@@ -200,3 +200,48 @@ func (checker *sameContents) Check(params []interface{}, names []string) (result
 	}
 	return reflect.DeepEqual(mob, mexp), ""
 }
+
+type isNilChecker struct {
+	*gc.CheckerInfo
+}
+
+// The IsNil checker tests whether the obtained value is nil.
+// Copied from the gocheck package with the addition of printing out
+// the error stack if the value is an error and supports the ErrorStack
+// method.
+//
+// For example:
+//
+//    c.Assert(err, IsNil)
+//
+var IsNil gc.Checker = &isNilChecker{
+	&gc.CheckerInfo{Name: "IsNil", Params: []string{"value"}},
+}
+
+type ErrorStacker interface {
+	error
+	ErrorStack() string
+}
+
+func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, string) {
+	result := isNil(params[0])
+	message := ""
+	if !result {
+		if stacker, ok := params[0].(ErrorStacker); ok {
+			message = stacker.ErrorStack()
+		}
+	}
+	return result, message
+}
+
+func isNil(obtained interface{}) (result bool) {
+	if obtained == nil {
+		result = true
+	} else {
+		switch v := reflect.ValueOf(obtained); v.Kind() {
+		case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+			return v.IsNil()
+		}
+	}
+	return
+}
