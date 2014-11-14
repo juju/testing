@@ -4,6 +4,7 @@
 package checkers_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -149,4 +150,42 @@ func (s *CheckerSuite) TestSameContents(c *gc.C) {
 	}, []string{})
 	c.Check(res, jc.IsFalse)
 	c.Check(err, gc.Not(gc.Equals), "")
+}
+
+type stack_error struct {
+	message string
+	stack   string
+}
+
+func (s *stack_error) Error() string {
+	return s.message
+}
+func (s *stack_error) ErrorStack() string {
+	return s.stack
+}
+
+func (s *CheckerSuite) TestIsNil(c *gc.C) {
+	checkOK := func(value interface{}) {
+		value, msg := jc.IsNil.Check([]interface{}{value}, nil)
+		c.Check(value, jc.IsTrue)
+		c.Check(msg, gc.Equals, "")
+	}
+
+	checkFails := func(value interface{}, match string) {
+		value, msg := jc.IsNil.Check([]interface{}{value}, nil)
+		c.Check(value, jc.IsFalse)
+		c.Check(msg, gc.Matches, match)
+	}
+
+	var typedNil *stack_error
+	checkOK(nil)
+	checkOK(typedNil)
+
+	checkFails(fmt.Errorf("an error"), "")
+
+	emptyStack := &stack_error{"message", ""}
+	checkFails(emptyStack, "")
+
+	withStack := &stack_error{"message", "filename:line\nfilename2:line2\n"}
+	checkFails(withStack, "filename:line\nfilename2:line2\n")
 }
