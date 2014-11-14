@@ -187,5 +187,5 @@ func (s *CheckerSuite) TestIsNil(c *gc.C) {
 	checkFails(emptyStack, "")
 
 	withStack := &stack_error{"message", "filename:line\nfilename2:line2\n"}
-	checkFails(withStack, "filename:line\nfilename2:line2\n")
+	checkFails(withStack, "error stack:\nfilename:line\nfilename2:line2\n")
 }

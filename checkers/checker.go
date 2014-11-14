@@ -229,6 +229,9 @@ func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, 
 	if !result {
 		if stacker, ok := params[0].(ErrorStacker); ok {
 			message = stacker.ErrorStack()
+			if message != "" {
+				message = "error stack:\n" + message
+			}
 		}
 	}
 	return result, message
