@@ -154,13 +154,13 @@ func (s *CheckerSuite) TestSameContents(c *gc.C) {
 
 type stack_error struct {
 	message string
-	stack   string
+	stack   []string
 }
 
 func (s *stack_error) Error() string {
 	return s.message
 }
-func (s *stack_error) ErrorStack() string {
+func (s *stack_error) StackTrace() []string {
 	return s.stack
 }
 
@@ -183,9 +183,10 @@ func (s *CheckerSuite) TestIsNil(c *gc.C) {
 
 	checkFails(fmt.Errorf("an error"), "")
 
-	emptyStack := &stack_error{"message", ""}
+	emptyStack := &stack_error{"message", nil}
 	checkFails(emptyStack, "")
 
-	withStack := &stack_error{"message", "filename:line\nfilename2:line2\n"}
-	checkFails(withStack, "error stack:\nfilename:line\nfilename2:line2\n")
+	withStack := &stack_error{"message", []string{
+		"filename:line", "filename2:line2"}}
+	checkFails(withStack, "error stack:\n\tfilename:line\n\tfilename2:line2")
 }

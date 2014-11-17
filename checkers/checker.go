@@ -220,7 +220,7 @@ var IsNil gc.Checker = &isNilChecker{
 
 type ErrorStacker interface {
 	error
-	ErrorStack() string
+	StackTrace() []string
 }
 
 func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, string) {
@@ -228,9 +228,9 @@ func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, 
 	message := ""
 	if !result {
 		if stacker, ok := params[0].(ErrorStacker); ok {
-			message = stacker.ErrorStack()
-			if message != "" {
-				message = "error stack:\n" + message
+			stack := stacker.StackTrace()
+			if stack != nil {
+				message = "error stack:\n\t" + strings.Join(stack, "\n\t")
 			}
 		}
 	}
