@@ -224,8 +224,7 @@ type ErrorStacker interface {
 }
 
 func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, string) {
-	result := isNil(params[0])
-	message := ""
+	result, message := isNil(params[0])
 	if !result {
 		if stacker, ok := params[0].(ErrorStacker); ok {
 			stack := stacker.StackTrace()
@@ -237,13 +236,17 @@ func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, 
 	return result, message
 }
 
-func isNil(obtained interface{}) (result bool) {
+func isNil(obtained interface{}) (result bool, message string) {
 	if obtained == nil {
 		result = true
 	} else {
 		switch v := reflect.ValueOf(obtained); v.Kind() {
-		case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-			return v.IsNil()
+		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Slice:
+			return v.IsNil(), ""
+		case reflect.Interface:
+			if v.IsNil() {
+				message = fmt.Sprintf("interface is a typed nil: %T", obtained)
+			}
 		}
 	}
 	return

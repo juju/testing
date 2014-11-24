@@ -178,9 +178,11 @@ func (s *CheckerSuite) TestIsNil(c *gc.C) {
 	}
 
 	var typedNil *stack_error
+	var typedNilAsInterface error = typedNil
 	checkOK(nil)
 	checkOK(typedNil)
 
+	checkFails(typedNilAsInterface, "typed nil")
 	checkFails(fmt.Errorf("an error"), "")
 
 	emptyStack := &stack_error{"message", nil}
