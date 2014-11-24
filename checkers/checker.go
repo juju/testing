@@ -201,21 +201,19 @@ func (checker *sameContents) Check(params []interface{}, names []string) (result
 	return reflect.DeepEqual(mob, mexp), ""
 }
 
-type isNilChecker struct {
+type errorIsNilChecker struct {
 	*gc.CheckerInfo
 }
 
-// The IsNil checker tests whether the obtained value is nil.
-// Copied from the gocheck package with the addition of printing out
-// the error stack if the value is an error and supports the ErrorStack
-// method.
+// The ErrorIsNil checker tests whether the obtained value is nil.
+// Explicitly tests against only `nil`.
 //
 // For example:
 //
-//    c.Assert(err, IsNil)
+//    c.Assert(err, ErrorIsNil)
 //
-var IsNil gc.Checker = &isNilChecker{
-	&gc.CheckerInfo{Name: "IsNil", Params: []string{"value"}},
+var ErrorIsNil gc.Checker = &errorIsNilChecker{
+	&gc.CheckerInfo{Name: "ErrorIsNil", Params: []string{"value"}},
 }
 
 type ErrorStacker interface {
@@ -223,10 +221,10 @@ type ErrorStacker interface {
 	StackTrace() []string
 }
 
-func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, string) {
-	result, message := isNil(params[0])
+func (checker *errorIsNilChecker) Check(params []interface{}, names []string) (bool, string) {
+	result, message := errorIsNil(params[0])
 	if !result {
-		if stacker, ok := params[0].(ErrorStacker); ok {
+		if stacker, ok := params[0].(ErrorStacker); ok && message == "" {
 			stack := stacker.StackTrace()
 			if stack != nil {
 				message = "error stack:\n\t" + strings.Join(stack, "\n\t")
@@ -236,18 +234,21 @@ func (checker *isNilChecker) Check(params []interface{}, names []string) (bool, 
 	return result, message
 }
 
-func isNil(obtained interface{}) (result bool, message string) {
+func errorIsNil(obtained interface{}) (result bool, message string) {
 	if obtained == nil {
-		result = true
-	} else {
-		switch v := reflect.ValueOf(obtained); v.Kind() {
-		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Slice:
-			return v.IsNil(), ""
-		case reflect.Interface:
-			if v.IsNil() {
-				message = fmt.Sprintf("interface is a typed nil: %T", obtained)
-			}
+		return true, ""
+	}
+
+	if _, ok := obtained.(error); !ok {
+		return false, fmt.Sprintf("obtained type (%T) is not an error", obtained)
+	}
+
+	switch v := reflect.ValueOf(obtained); v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		if v.IsNil() {
+			return false, fmt.Sprintf("value of (%T) is nil, but a typed nil", obtained)
 		}
 	}
-	return
+
+	return false, ""
 }

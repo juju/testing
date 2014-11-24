@@ -157,6 +157,11 @@ type stack_error struct {
 	stack   []string
 }
 
+type embedded struct {
+	typed *stack_error
+	err   error
+}
+
 func (s *stack_error) Error() string {
 	return s.message
 }
@@ -164,26 +169,43 @@ func (s *stack_error) StackTrace() []string {
 	return s.stack
 }
 
-func (s *CheckerSuite) TestIsNil(c *gc.C) {
+type value_error string
+
+func (e value_error) Error() string {
+	return string(e)
+}
+
+func (s *CheckerSuite) TestErrorIsNil(c *gc.C) {
 	checkOK := func(value interface{}) {
-		value, msg := jc.IsNil.Check([]interface{}{value}, nil)
+		value, msg := jc.ErrorIsNil.Check([]interface{}{value}, nil)
 		c.Check(value, jc.IsTrue)
 		c.Check(msg, gc.Equals, "")
 	}
 
 	checkFails := func(value interface{}, match string) {
-		value, msg := jc.IsNil.Check([]interface{}{value}, nil)
+		value, msg := jc.ErrorIsNil.Check([]interface{}{value}, nil)
 		c.Check(value, jc.IsFalse)
 		c.Check(msg, gc.Matches, match)
 	}
 
 	var typedNil *stack_error
 	var typedNilAsInterface error = typedNil
-	checkOK(nil)
-	checkOK(typedNil)
+	var nilError error
+	var value value_error
+	var emptyValueErrorAsInterface error = value
+	var embed embedded
 
-	checkFails(typedNilAsInterface, "typed nil")
+	checkOK(nil)
+	checkOK(nilError)
+	checkOK(embed.err)
+
+	checkFails([]string{}, `obtained type \(.*\) is not an error`)
+	checkFails("", `obtained type \(.*\) is not an error`)
+	checkFails(embed.typed, `value of \(.*\) is nil, but a typed nil`)
+	checkFails(typedNilAsInterface, `value of \(.*\) is nil, but a typed nil`)
 	checkFails(fmt.Errorf("an error"), "")
+	checkFails(value, "")
+	checkFails(emptyValueErrorAsInterface, "")
 
 	emptyStack := &stack_error{"message", nil}
 	checkFails(emptyStack, "")
