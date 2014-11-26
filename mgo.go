@@ -332,12 +332,6 @@ func (inst *MgoInstance) Destroy() {
 	inst.killAndCleanup(os.Kill)
 }
 
-// DestroyWithLog causes mongod to exit, cleans up its data directory,
-// and captures the last N lines of mongod's log output.
-func (inst *MgoInstance) DestroyWithLog() {
-	inst.killAndCleanup(os.Interrupt)
-}
-
 // Restart restarts the mongo server, useful for
 // testing what happens when a state server goes down.
 func (inst *MgoInstance) Restart() {
