@@ -42,9 +42,9 @@ func (s *fakeHomeSuite) TestHomeCreated(c *gc.C) {
 	// The original home has been restored.
 	switch runtime.GOOS {
 	case "windows":
-		c.Assert(utils.Home(), gc.Equals, "C:/tmp/tests")
+		c.Assert(utils.Home(), jc.SamePath, "C:/tmp/tests")
 	default:
-		c.Assert(utils.Home(), gc.Equals, "/tmp/tests")
+		c.Assert(utils.Home(), jc.SamePath, "/tmp/tests")
 	}
 }
 
