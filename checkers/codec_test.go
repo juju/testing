@@ -47,7 +47,7 @@ func (s *CheckerSuite) TestJSONEquals(c *gc.C) {
 			result: true,
 		}, {
 			descr: "nested with newline",
-			obtained: `{"First": 47.11, "Last": [{"First": "Hello", "Second": 42}, 
+			obtained: `{"First": 47.11, "Last": [{"First": "Hello", "Second": 42},
 			{"First": "World", "Third": {"T": true, "F": false}}]}`,
 			expected: &Outer{
 				First: 47.11,
@@ -137,10 +137,10 @@ func (s *CheckerSuite) TestYAMLEquals(c *gc.C) {
 			result: false,
 			msg:    `mismatch at .*: validity mismatch; .*`,
 		}, {
-			descr:    "illegal optained content",
+			descr:    "illegal obtained content",
 			obtained: `{"NotThere": `,
 			result:   false,
-			msg:      `cannot unmarshal expected contents: YAML error: .*`,
+			msg:      `cannot unmarshal obtained contents: YAML error: .*`,
 		},
 	}
 	for i, test := range tests {
