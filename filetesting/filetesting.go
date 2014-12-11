@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -109,7 +110,10 @@ func (d Dir) Check(c *gc.C, basePath string) Entry {
 	if !c.Check(err, gc.IsNil, comment) {
 		return d
 	}
-	c.Check(fileInfo.Mode()&os.ModePerm, gc.Equals, d.Perm, comment)
+	// Skip until we implement proper permissions checking
+	if runtime.GOOS != "windows" {
+		c.Check(fileInfo.Mode()&os.ModePerm, gc.Equals, d.Perm, comment)
+	}
 	c.Check(fileInfo.Mode()&os.ModeType, gc.Equals, os.ModeDir, comment)
 	return d
 }
@@ -142,9 +146,12 @@ func (f File) Check(c *gc.C, basePath string) Entry {
 	if !c.Check(err, gc.IsNil, comment) {
 		return f
 	}
-	mode := fileInfo.Mode()
-	c.Check(mode&os.ModeType, gc.Equals, os.FileMode(0), comment)
-	c.Check(mode&os.ModePerm, gc.Equals, f.Perm, comment)
+	// Skip until we implement proper permissions checking
+	if runtime.GOOS != "windows" {
+		mode := fileInfo.Mode()
+		c.Check(mode&os.ModeType, gc.Equals, os.FileMode(0), comment)
+		c.Check(mode&os.ModePerm, gc.Equals, f.Perm, comment)
+	}
 	data, err := ioutil.ReadFile(path)
 	c.Check(err, gc.IsNil, comment)
 	c.Check(string(data), gc.Equals, f.Data, comment)
