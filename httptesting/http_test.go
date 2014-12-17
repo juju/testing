@@ -6,6 +6,7 @@ package httptesting_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -85,7 +86,7 @@ var assertJSONCallTests = []struct {
 		ExpectStatus: http.StatusBadRequest,
 	},
 }, {
-	about: "custom DoRequest",
+	about: "custom Do",
 	params: httptesting.JSONCallParams{
 		URL:          "/",
 		ExpectStatus: http.StatusTeapot,
@@ -94,6 +95,26 @@ var assertJSONCallTests = []struct {
 			resp.StatusCode = http.StatusTeapot
 			return resp, err
 		},
+	},
+}, {
+	about: "expect error",
+	params: httptesting.JSONCallParams{
+		URL:          "/",
+		ExpectStatus: http.StatusTeapot,
+		Do: func(req *http.Request) (*http.Response, error) {
+			return nil, fmt.Errorf("some error")
+		},
+		ExpectError: "some error",
+	},
+}, {
+	about: "expect error regexp",
+	params: httptesting.JSONCallParams{
+		URL:          "/",
+		ExpectStatus: http.StatusTeapot,
+		Do: func(req *http.Request) (*http.Response, error) {
+			return nil, fmt.Errorf("some bad error")
+		},
+		ExpectError: "some .* error",
 	},
 }}
 

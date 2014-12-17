@@ -21,6 +21,12 @@ type JSONCallParams struct {
 	// If it is nil, http.DefaultClient.Do will be used.
 	Do func(*http.Request) (*http.Response, error)
 
+	// ExpectError holds the error regexp to match
+	// against the error returned from the HTTP Do
+	// request. If it is empty, the error is expected to be
+	// nil.
+	ExpectError string
+
 	// Handler holds the handler to use to make the request.
 	Handler http.Handler
 
@@ -65,7 +71,8 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 		p.ExpectStatus = http.StatusOK
 	}
 	rec := DoRequest(c, DoRequestParams{
-		Do:     p.Do,
+		Do:            p.Do,
+		ExpectError:   p.ExpectError,
 		Handler:       p.Handler,
 		Method:        p.Method,
 		URL:           p.URL,
@@ -75,6 +82,9 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 		Username:      p.Username,
 		Password:      p.Password,
 	})
+	if p.ExpectError != "" {
+		return
+	}
 	AssertJSONResponse(c, rec, p.ExpectStatus, p.ExpectBody)
 }
 
@@ -98,6 +108,12 @@ type DoRequestParams struct {
 	// Do is used to make the HTTP request.
 	// If it is nil, http.DefaultClient.Do will be used.
 	Do func(*http.Request) (*http.Response, error)
+
+	// ExpectError holds the error regexp to match
+	// against the error returned from the HTTP Do
+	// request. If it is empty, the error is expected to be
+	// nil.
+	ExpectError string
 
 	// Handler holds the handler to use to make the request.
 	Handler http.Handler
@@ -152,6 +168,10 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 		req.SetBasicAuth(p.Username, p.Password)
 	}
 	resp, err := p.Do(req)
+	if p.ExpectError != "" {
+		c.Assert(err, gc.ErrorMatches, p.ExpectError)
+		return nil
+	}
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 
