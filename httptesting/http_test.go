@@ -12,7 +12,7 @@ import (
 
 	gc "gopkg.in/check.v1"
 
-	"github.com/juju/testing"
+	"github.com/juju/testing/httptesting"
 )
 
 type requestsSuite struct{}
@@ -50,28 +50,28 @@ func makeHandler(c *gc.C, status int, ctype string) http.Handler {
 
 var assertJSONCallTests = []struct {
 	about  string
-	params testing.JSONCallParams
+	params httptesting.JSONCallParams
 }{{
 	about: "simple request",
-	params: testing.JSONCallParams{
+	params: httptesting.JSONCallParams{
 		Method: "GET",
 		URL:    "/",
 	},
 }, {
 	about: "method not specified",
-	params: testing.JSONCallParams{
+	params: httptesting.JSONCallParams{
 		URL: "/",
 	},
 }, {
 	about: "POST request with a body",
-	params: testing.JSONCallParams{
+	params: httptesting.JSONCallParams{
 		Method: "POST",
 		URL:    "/my/url",
 		Body:   strings.NewReader("request body"),
 	},
 }, {
 	about: "authentication",
-	params: testing.JSONCallParams{
+	params: httptesting.JSONCallParams{
 		URL:          "/",
 		Method:       "PUT",
 		Username:     "who",
@@ -80,9 +80,20 @@ var assertJSONCallTests = []struct {
 	},
 }, {
 	about: "error status",
-	params: testing.JSONCallParams{
+	params: httptesting.JSONCallParams{
 		URL:          "/",
 		ExpectStatus: http.StatusBadRequest,
+	},
+}, {
+	about: "custom DoRequest",
+	params: httptesting.JSONCallParams{
+		URL:          "/",
+		ExpectStatus: http.StatusTeapot,
+		Do: func(req *http.Request) (*http.Response, error) {
+			resp, err := http.DefaultClient.Do(req)
+			resp.StatusCode = http.StatusTeapot
+			return resp, err
+		},
 	},
 }}
 
@@ -124,7 +135,7 @@ func (*requestsSuite) TestAssertJSONCall(c *gc.C) {
 			expectBody.Auth = true
 		}
 		params.ExpectBody = expectBody
-		testing.AssertJSONCall(c, params)
+		httptesting.AssertJSONCall(c, params)
 	}
 }
 

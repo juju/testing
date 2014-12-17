@@ -17,6 +17,10 @@ import (
 // JSONCallParams holds parameters for AssertJSONCall.
 // If left empty, some fields will automatically be filled with defaults.
 type JSONCallParams struct {
+	// Do is used to make the HTTP request.
+	// If it is nil, http.DefaultClient.Do will be used.
+	Do func(*http.Request) (*http.Response, error)
+
 	// Handler holds the handler to use to make the request.
 	Handler http.Handler
 
@@ -61,6 +65,7 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 		p.ExpectStatus = http.StatusOK
 	}
 	rec := DoRequest(c, DoRequestParams{
+		Do:     p.Do,
 		Handler:       p.Handler,
 		Method:        p.Method,
 		URL:           p.URL,
@@ -90,6 +95,10 @@ func AssertJSONResponse(c *gc.C, rec *httptest.ResponseRecorder, expectStatus in
 // DoRequestParams holds parameters for DoRequest.
 // If left empty, some fields will automatically be filled with defaults.
 type DoRequestParams struct {
+	// Do is used to make the HTTP request.
+	// If it is nil, http.DefaultClient.Do will be used.
+	Do func(*http.Request) (*http.Response, error)
+
 	// Handler holds the handler to use to make the request.
 	Handler http.Handler
 
@@ -125,6 +134,9 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	if p.Method == "" {
 		p.Method = "GET"
 	}
+	if p.Do == nil {
+		p.Do = http.DefaultClient.Do
+	}
 	srv := httptest.NewServer(p.Handler)
 	defer srv.Close()
 
@@ -139,7 +151,7 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	if p.Username != "" || p.Password != "" {
 		req.SetBasicAuth(p.Username, p.Password)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := p.Do(req)
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 
