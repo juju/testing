@@ -61,6 +61,9 @@ type JSONCallParams struct {
 
 	// ExpectBody holds the expected JSON body.
 	ExpectBody interface{}
+
+	// Cookies, if specified, are added to the request.
+	Cookies []*http.Cookie
 }
 
 // AssertJSONCall asserts that when the given handler is called with
@@ -81,6 +84,7 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 		ContentLength: p.ContentLength,
 		Username:      p.Username,
 		Password:      p.Password,
+		Cookies:       p.Cookies,
 	})
 	if p.ExpectError != "" {
 		return
@@ -142,6 +146,9 @@ type DoRequestParams struct {
 
 	// Password, if specified, is used for HTTP basic authentication.
 	Password string
+
+	// Cookies, if specified, are added to the request.
+	Cookies []*http.Cookie
 }
 
 // DoRequest invokes a request on the given handler with the given
@@ -166,6 +173,9 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	}
 	if p.Username != "" || p.Password != "" {
 		req.SetBasicAuth(p.Username, p.Password)
+	}
+	for _, cookie := range p.Cookies {
+		req.AddCookie(cookie)
 	}
 	resp, err := p.Do(req)
 	if p.ExpectError != "" {
