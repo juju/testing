@@ -23,7 +23,7 @@ type FakeCall struct {
 // embedded in another struct that will define the methods to track:
 //
 //    type fakeConn struct {
-//        fake
+//        testing.Fake
 //        Response []byte
 //    }
 //
@@ -31,14 +31,15 @@ type FakeCall struct {
 //        fc.AddCall("Send", FakeCallArgs{
 //            "request": request,
 //        })
-//        return fc.Response, fc.Error()
+//        return fc.Response, fc.Err()
 //    }
 //
-// Fake has two fields for error situations. Setting "Err" is intended
-// to cause any method call to fail. This is facilitated by the Error
-// method, as seen in the above example. In some cases the first method
-// call is not the one you want to fail. If not then set "FailOnCall" to
-// the ordered index of the call which should fail.
+// Error return values are set through Fake.Errors. Set it to the errors
+// you want returned. The errors will be matched up to the calls made on
+// Fake methods, in order. This is facilitated by the Err method, as
+// seen in the above example. In some cases the first method call is not
+// the one you want to fail. If not then put a nil before the error in
+// Fake.Errors. Fake.SetErrors is a helper for setting up failure cases.
 //
 // To validate calls made to the fake in a test, call the CheckCalls
 // method:
@@ -62,18 +63,25 @@ type FakeCall struct {
 type Fake struct {
 	calls []FakeCall
 
-	Err        error
-	FailOnCall int
+	// Errors holds the list of error return values to use for
+	// successive calls to methods that return an error. Each call
+	// pops the next error off the list. An empty list (the default)
+	// implies a nil error. nil may be precede actual errors in the
+	// list, which means that the first calls will succeed, followed
+	// by the failure. All this is facilitated through the Err method.
+	Errors []error
 }
 
 // Error returns the error that should be returned on the nth call to
 // any method on the fake. It should be called for the error return in
 // all faked methods.
-func (f *Fake) Error() error {
-	if len(f.calls) != f.FailOnCall+1 {
+func (f *Fake) Err() error {
+	if len(f.Errors) == 0 {
 		return nil
 	}
-	return f.Err
+	err := f.Errors[0]
+	f.Errors = f.Errors[1:]
+	return err
 }
 
 // AddCall records a faked method call for later inspection using the
@@ -85,8 +93,20 @@ func (f *Fake) AddCall(funcName string, args FakeCallArgs) {
 	})
 }
 
+// SetErrors sets the errors for the fake. Each call to Err (thus each
+// fake method call) pops an error off the front. So frontloading nil
+// here will allow calls to pass, followed by a failure.
+func (f *Fake) SetErrors(errors ...error) {
+	f.Errors = errors
+}
+
 // CheckCalls verifies that the history of calls on the fake's methods
 // matches the expected calls.
 func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 	c.Check(f.calls, jc.DeepEquals, expected)
+}
+
+// ResetCalls clears the history of calls.
+func (f *Fake) ResetCalls() {
+	f.calls = nil
 }
