@@ -61,7 +61,10 @@ type FakeCall struct {
 // func, as well as controlling the return value from the func in a
 // clean manner (by simply setting the correct fake field).
 type Fake struct {
-	calls []FakeCall
+	// Calls is the list of calls that have been registered on the fake
+	// (i.e. made on the fake's methods), in the order that they were
+	// made.
+	Calls []FakeCall
 
 	// Errors holds the list of error return values to use for
 	// successive calls to methods that return an error. Each call
@@ -87,7 +90,7 @@ func (f *Fake) Err() error {
 // AddCall records a faked method call for later inspection using the
 // CheckCalls method. All faked methods should call AddCall.
 func (f *Fake) AddCall(funcName string, args FakeCallArgs) {
-	f.calls = append(f.calls, FakeCall{
+	f.Calls = append(f.Calls, FakeCall{
 		FuncName: funcName,
 		Args:     args,
 	})
@@ -103,10 +106,10 @@ func (f *Fake) SetErrors(errors ...error) {
 // CheckCalls verifies that the history of calls on the fake's methods
 // matches the expected calls.
 func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
-	c.Check(f.calls, jc.DeepEquals, expected)
+	c.Check(f.Calls, jc.DeepEquals, expected)
 }
 
 // ResetCalls clears the history of calls.
 func (f *Fake) ResetCalls() {
-	f.calls = nil
+	f.Calls = nil
 }
