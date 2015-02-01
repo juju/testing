@@ -18,6 +18,7 @@ type cleanupStack []CleanupFunc
 type CleanupSuite struct {
 	testStack  cleanupStack
 	suiteStack cleanupStack
+	setUpTest  bool
 }
 
 func (s *CleanupSuite) SetUpSuite(c *gc.C) {
@@ -29,11 +30,13 @@ func (s *CleanupSuite) TearDownSuite(c *gc.C) {
 }
 
 func (s *CleanupSuite) SetUpTest(c *gc.C) {
+	s.setUpTest = true
 	s.testStack = nil
 }
 
 func (s *CleanupSuite) TearDownTest(c *gc.C) {
 	s.callStack(c, s.testStack)
+	s.setUpTest = false
 }
 
 func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
@@ -45,13 +48,11 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 // AddCleanup pushes the cleanup function onto the stack of functions to be
 // called during TearDownTest.
 func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
-	s.testStack = append(s.testStack, cleanup)
-}
-
-// AddSuiteCleanup pushes the cleanup function onto the stack of functions to
-// be called during TearDownSuite.
-func (s *CleanupSuite) AddSuiteCleanup(cleanup CleanupFunc) {
-	s.suiteStack = append(s.suiteStack, cleanup)
+	if s.setUpTest {
+		s.testStack = append(s.testStack, cleanup)
+	} else {
+		s.suiteStack = append(s.suiteStack, cleanup)
+	}
 }
 
 // PatchEnvironment sets the environment variable 'name' the the value passed
