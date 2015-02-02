@@ -23,8 +23,14 @@ type FakeCall struct {
 // embedded in another struct that will define the methods to track:
 //
 //    type fakeConn struct {
-//        testing.Fake
+//        *testing.Fake
 //        Response []byte
+//    }
+//
+//    func newFakeConn() *fakeConn {
+//        return &fakeConn{
+//            Fake: &testing.Fake{},
+//        }
 //    }
 //
 //    func (fc fakeConn) Send(request string) []byte {
@@ -33,6 +39,9 @@ type FakeCall struct {
 //        })
 //        return fc.Response, fc.Err()
 //    }
+//
+// As demonstrated in the example, embed a pointer to testing.Fake. This
+// allows a single testing.Fake to be shared between multiple fakes.
 //
 // Error return values are set through Fake.Errors. Set it to the errors
 // you want returned. The errors will be matched up to the calls made on
