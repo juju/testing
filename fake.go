@@ -118,6 +118,16 @@ func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 	c.Check(f.Calls, jc.DeepEquals, expected)
 }
 
+// CheckCallNames verifies that the in-order list of called method names
+// matches the expected calls.
+func (f *Fake) CheckCallNames(c *gc.C, expected ...string) {
+	var funcNames []string
+	for _, call := range f.Calls {
+		funcNames = append(funcNames, call.FuncName)
+	}
+	c.Check(funcNames, jc.DeepEquals, expected)
+}
+
 // ResetCalls clears the history of calls.
 func (f *Fake) ResetCalls() {
 	f.Calls = nil
