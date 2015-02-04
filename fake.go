@@ -89,6 +89,10 @@ type Fake struct {
 	// list, which means that the first calls will succeed, followed
 	// by the failure. All this is facilitated through the Err method.
 	Errors []error
+
+	// Error is the default error (when Errors is empty). The typical
+	// Fake usage will leave this nil (i.e. no error).
+	Error error
 }
 
 // Error returns the error that should be returned on the nth call to
@@ -96,7 +100,7 @@ type Fake struct {
 // all faked methods.
 func (f *Fake) Err() error {
 	if len(f.Errors) == 0 {
-		return nil
+		return f.Error
 	}
 	err := f.Errors[0]
 	f.Errors = f.Errors[1:]
