@@ -13,8 +13,15 @@ type FakeCallArgs map[string]interface{}
 
 // FakeCall records the name of a called function and the passed args.
 type FakeCall struct {
+	// Receiver is the fake for which the function was called. It is
+	// not required, particularly if the function is not a method.
+	Receiver interface{}
+
+	// Funcname is the name of the function that was called.
 	FuncName string
-	Args     FakeCallArgs
+
+	// Args is the set of arguments to the function.
+	Args FakeCallArgs
 }
 
 // Fake is used in testing to stand in for some other value, to record
@@ -100,6 +107,16 @@ func (f *Fake) Err() error {
 // CheckCalls method. All faked methods should call AddCall.
 func (f *Fake) AddCall(funcName string, args FakeCallArgs) {
 	f.Calls = append(f.Calls, FakeCall{
+		FuncName: funcName,
+		Args:     args,
+	})
+}
+
+// AddRcvrCall records a faked method call for later inspection using
+// the CheckCalls method. All faked methods should call AddCall.
+func (f *Fake) AddRcvrCall(receiver interface{}, funcName string, args FakeCallArgs) {
+	f.Calls = append(f.Calls, FakeCall{
+		Receiver: receiver,
 		FuncName: funcName,
 		Args:     args,
 	})
