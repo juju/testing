@@ -148,8 +148,3 @@ func (f *Fake) CheckCallNames(c *gc.C, expected ...string) {
 	}
 	c.Check(funcNames, jc.DeepEquals, expected)
 }
-
-// ResetCalls clears the history of calls.
-func (f *Fake) ResetCalls() {
-	f.Calls = nil
-}
