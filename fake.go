@@ -149,12 +149,6 @@ func (f *Fake) CheckCallNames(c *gc.C, expected ...string) {
 	c.Check(funcNames, jc.DeepEquals, expected)
 }
 
-// Reset sets the fake back to a pristine state.
-func (f *Fake) Reset() {
-	f.ResetCalls()
-	f.Errors = nil
-}
-
 // ResetCalls clears the history of calls.
 func (f *Fake) ResetCalls() {
 	f.Calls = nil
