@@ -117,7 +117,8 @@ func (f *Fake) AddCall(funcName string, args FakeCallArgs) {
 }
 
 // AddRcvrCall records a faked method call for later inspection using
-// the CheckCalls method. All faked methods should call AddCall.
+// the CheckCalls method. Unlike AddCall, AddRcvrCall tracks the
+// receiver of the called method.
 func (f *Fake) AddRcvrCall(receiver interface{}, funcName string, args FakeCallArgs) {
 	f.Calls = append(f.Calls, FakeCall{
 		Receiver: receiver,
