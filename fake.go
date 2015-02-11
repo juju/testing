@@ -44,7 +44,7 @@ type FakeCall struct {
 //        fc.AddCall("Send", FakeCallArgs{
 //            "request": request,
 //        })
-//        return fc.Response, fc.Err()
+//        return fc.Response, fc.NextErr()
 //    }
 //
 // As demonstrated in the example, embed a pointer to testing.Fake. This
@@ -95,10 +95,10 @@ type Fake struct {
 	Error error
 }
 
-// Error returns the error that should be returned on the nth call to
+// NextErr returns the error that should be returned on the nth call to
 // any method on the fake. It should be called for the error return in
 // all faked methods.
-func (f *Fake) Err() error {
+func (f *Fake) NextErr() error {
 	if len(f.Errors) == 0 {
 		return f.Error
 	}
