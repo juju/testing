@@ -51,11 +51,10 @@ type FakeCall struct {
 // allows a single testing.Fake to be shared between multiple fakes.
 //
 // Error return values are set through Fake.Errors. Set it to the errors
-// you want returned. The errors will be matched up to the calls made on
-// Fake methods, in order. This is facilitated by the Err method, as
-// seen in the above example. In some cases the first method call is not
-// the one you want to fail. If not then put a nil before the error in
-// Fake.Errors. Fake.SetErrors is a helper for setting up failure cases.
+// you want returned (or use the convenience method `SetErrors`). The
+// `NextErr` method returns the errors from Fake.Errors in sequence,
+// falling back to `DefaultError` when the sequence is exhausted. Thus
+// each fake method should call `NextErr` to get its error return value.
 //
 // To validate calls made to the fake in a test, call the CheckCalls
 // method:
