@@ -10,7 +10,8 @@ import (
 
 // TODO(ericsnow) Drop FakeCall.Receiver? In the cases that it matters
 // it can be set as the first arg...  Still, it does make sense to treat
-// the receiver specially.
+// the receiver specially. Perhaps track receivers in a separate slice
+// (e.g. Fake.Receivers).
 
 // FakeCall records the name of a called function and the passed args.
 type FakeCall struct {
@@ -140,8 +141,6 @@ func (f *Fake) AddCall(funcName string, args ...interface{}) int {
 	})
 	return len(f.Calls) - 1
 }
-
-// TODO(ericsnow) Drop MethodCall?
 
 // MethodCall records a faked method call for later inspection using
 // the CheckCalls method. Unlike AddCall, MethodCall tracks the
