@@ -8,9 +8,6 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-// FakeCallArgs holds all the args passed in a call.
-type FakeCallArgs map[string]interface{}
-
 // FakeCall records the name of a called function and the passed args.
 type FakeCall struct {
 	// Receiver is the fake for which the function was called. It is
@@ -20,8 +17,9 @@ type FakeCall struct {
 	// Funcname is the name of the function that was called.
 	FuncName string
 
-	// Args is the set of arguments to the function.
-	Args FakeCallArgs
+	// Args is the set of arguments passed to the function. They are
+	// in the same order as the function's parameters
+	Args []interface{}
 }
 
 // Fake is used in testing to stand in for some other value, to record
@@ -41,9 +39,7 @@ type FakeCall struct {
 //    }
 //
 //    func (fc fakeConn) Send(request string) []byte {
-//        fc.AddCall("Send", FakeCallArgs{
-//            "request": request,
-//        })
+//        fc.AddCall("Send", request)
 //        return fc.Response, fc.NextErr()
 //    }
 //
@@ -61,8 +57,8 @@ type FakeCall struct {
 //
 //    s.fake.CheckCalls(c, []FakeCall{{
 //        FuncName: "Send",
-//        Args: FakeCallArgs{
-//            "request": expected,
+//        Args: []interface{}{
+//            expected,
 //        },
 //    }
 //
@@ -108,17 +104,19 @@ func (f *Fake) NextErr() error {
 
 // AddCall records a faked method call for later inspection using the
 // CheckCalls method. All faked methods should call AddCall.
-func (f *Fake) AddCall(funcName string, args FakeCallArgs) {
+func (f *Fake) AddCall(funcName string, args ...interface{}) {
 	f.Calls = append(f.Calls, FakeCall{
 		FuncName: funcName,
 		Args:     args,
 	})
 }
 
+// TODO(ericsnow) Drop AddRcvrCall (have AddCall return *FakeCall).
+
 // AddRcvrCall records a faked method call for later inspection using
 // the CheckCalls method. Unlike AddCall, AddRcvrCall tracks the
 // receiver of the called method.
-func (f *Fake) AddRcvrCall(receiver interface{}, funcName string, args FakeCallArgs) {
+func (f *Fake) AddRcvrCall(receiver interface{}, funcName string, args ...interface{}) {
 	f.Calls = append(f.Calls, FakeCall{
 		Receiver: receiver,
 		FuncName: funcName,
