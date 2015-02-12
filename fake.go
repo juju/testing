@@ -8,6 +8,8 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
+// TODO(ericsnow) Drop FakeCall.Receiver?
+
 // FakeCall records the name of a called function and the passed args.
 type FakeCall struct {
 	// Receiver is the fake for which the function was called. It is
@@ -102,8 +104,11 @@ func (f *Fake) NextErr() error {
 	return err
 }
 
-// AddCall records a faked method call for later inspection using the
-// CheckCalls method. All faked methods should call AddCall.
+// AddCall records a faked function call for later inspection using the
+// CheckCalls method. In the case of methods the receiver is not
+// recorded. However, the receiver is not significant for most testing.
+// All faked functions should call AddCall (or perhaps AddRcvrCall in
+// the case of methods).
 func (f *Fake) AddCall(funcName string, args ...interface{}) {
 	f.Calls = append(f.Calls, FakeCall{
 		FuncName: funcName,
@@ -124,15 +129,18 @@ func (f *Fake) AddRcvrCall(receiver interface{}, funcName string, args ...interf
 	})
 }
 
-// SetErrors sets the errors for the fake. Each call to Err (thus each
-// fake method call) pops an error off the front. So frontloading nil
-// here will allow calls to pass, followed by a failure.
+// SetErrors sets the sequence of error returns for the fake. Each call
+// to Err (thus each fake method call) pops an error off the front. So
+// frontloading nil here will allow calls to pass, followed by a
+// failure.
 func (f *Fake) SetErrors(errors ...error) {
 	f.Errors = errors
 }
 
 // CheckCalls verifies that the history of calls on the fake's methods
-// matches the expected calls.
+// matches the expected calls. This includes checking the receiver. If
+// the receiver is not significant then the faked method should not set
+// it.
 func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 	c.Check(f.Calls, jc.DeepEquals, expected)
 }
