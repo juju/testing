@@ -131,8 +131,8 @@ func (f *Fake) NextErr() error {
 // AddCall records a faked function call for later inspection using the
 // CheckCalls method. In the case of methods the receiver is not
 // recorded. However, the receiver is not significant for most testing.
-// All faked functions should call AddCall (or perhaps MethodCall in
-// the case of methods).
+// All faked functions should call AddCall (or MethodCall in the case of
+// methods).
 func (f *Fake) AddCall(funcName string, args ...interface{}) int {
 	f.Calls = append(f.Calls, FakeCall{
 		FuncName: funcName,
@@ -161,17 +161,42 @@ func (f *Fake) SetErrors(errors ...error) {
 }
 
 // CheckCalls verifies that the history of calls on the fake's methods
-// matches the expected calls. This includes checking the receiver. If
-// the receiver is not significant then the faked method should not set
-// it.
+// matches the expected calls. The receivers are not checked. If they
+// are significant then simply compare the calls directly:
+//
+//     c.Check(s.fake.Calls, jc.DeepEquals, expected)
 func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
-	c.Check(f.Calls, jc.DeepEquals, expected)
+	if !f.CheckCallNames(c, fakeCallNames(expected...)...) {
+		return
+	}
+
+	calls := copyWithoutReceivers(f.Calls)
+	expected = copyWithoutReceivers(expected)
+	c.Check(calls, jc.DeepEquals, expected)
+}
+
+func fakeCallNames(calls ...FakeCall) []string {
+	var funcNames []string
+	for _, call := range calls {
+		funcNames = append(funcNames, call.FuncName)
+	}
+	return funcNames
+}
+
+func copyWithoutReceivers(calls []FakeCall) []FakeCall {
+	copied := make([]FakeCall, len(calls), len(calls))
+	for i, call := range calls {
+		// Copy the value.
+		copied[i] = call
+		copied[i].Receiver = nil
+	}
+	return copied
 }
 
 // CheckCall checks the recorded call at the given index against the
 // provided values. If the index is out of bounds then the check fails.
-// The receiver of the call is significant for a test then it can be
-// checked separately:
+// The receiver is not checked. If it is significant for a test then it
+// can be checked separately:
 //
 //     c.Check(myfake.Calls[index].Receiver, gc.Equals, expected)
 func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{}) {
@@ -189,10 +214,7 @@ func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{
 
 // CheckCallNames verifies that the in-order list of called method names
 // matches the expected calls.
-func (f *Fake) CheckCallNames(c *gc.C, expected ...string) {
-	var funcNames []string
-	for _, call := range f.Calls {
-		funcNames = append(funcNames, call.FuncName)
-	}
-	c.Check(funcNames, jc.DeepEquals, expected)
+func (f *Fake) CheckCallNames(c *gc.C, expected ...string) bool {
+	funcNames := fakeCallNames(f.Calls...)
+	return c.Check(funcNames, jc.DeepEquals, expected)
 }
