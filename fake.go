@@ -59,7 +59,7 @@ type FakeCall struct {
 // each fake method should call `NextErr` to get its error return value.
 //
 // To validate calls made to the fake in a test, check Fake.Calls or
-// call the CheckCalls method:
+// call the CheckCalls (or CheckCall) method:
 //
 //    c.Check(s.fake.Calls, jc.DeepEquals, []FakeCall{{
 //        Receiver: s.fake,
@@ -76,6 +76,8 @@ type FakeCall struct {
 //            expected,
 //        },
 //    }})
+//
+//    s.fake.CheckCall(c, 0, "Send", expected)
 //
 // Not only is Fake useful for building a interface implementation to
 // use in testing (e.g. a network API client), it is also useful in
