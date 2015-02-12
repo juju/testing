@@ -135,6 +135,7 @@ func (s *fakeSuite) TestAddCallRecorded(c *gc.C) {
 		FuncName: "aFunc",
 		Args:     []interface{}{1, 2, 3},
 	}})
+	c.Check(s.fake.Receivers, jc.DeepEquals, []interface{}{nil})
 }
 
 func (s *fakeSuite) TestAddCallRepeated(c *gc.C) {
@@ -156,6 +157,7 @@ func (s *fakeSuite) TestAddCallRepeated(c *gc.C) {
 		FuncName: "after",
 		Args:     []interface{}{"arg"},
 	}})
+	c.Check(s.fake.Receivers, jc.DeepEquals, []interface{}{nil, nil, nil, nil})
 }
 
 func (s *fakeSuite) TestAddCallNoArgs(c *gc.C) {
@@ -180,14 +182,14 @@ func (s *fakeSuite) TestAddCallSequence(c *gc.C) {
 	}})
 }
 
-func (s *fakeSuite) TestMethodCall(c *gc.C) {
+func (s *fakeSuite) TestMethodCallRecorded(c *gc.C) {
 	s.fake.MethodCall(s.fake, "aMethod", 1, 2, 3)
 
 	c.Check(s.fake.Calls, jc.DeepEquals, []testing.FakeCall{{
-		Receiver: s.fake,
 		FuncName: "aMethod",
 		Args:     []interface{}{1, 2, 3},
 	}})
+	c.Check(s.fake.Receivers, jc.DeepEquals, []interface{}{s.fake})
 }
 
 func (s *fakeSuite) TestMethodCallMixed(c *gc.C) {
@@ -196,16 +198,15 @@ func (s *fakeSuite) TestMethodCallMixed(c *gc.C) {
 	s.fake.MethodCall(s.fake, "Method2")
 
 	c.Check(s.fake.Calls, jc.DeepEquals, []testing.FakeCall{{
-		Receiver: s.fake,
 		FuncName: "Method1",
 		Args:     []interface{}{1, 2, 3},
 	}, {
 		FuncName: "aFunc",
 		Args:     []interface{}{"arg"},
 	}, {
-		Receiver: s.fake,
 		FuncName: "Method2",
 	}})
+	c.Check(s.fake.Receivers, jc.DeepEquals, []interface{}{s.fake, nil, s.fake})
 }
 
 func (s *fakeSuite) TestMethodCallEmbeddedMixed(c *gc.C) {
@@ -221,20 +222,18 @@ func (s *fakeSuite) TestMethodCallEmbeddedMixed(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(s.fake.Calls, jc.DeepEquals, []testing.FakeCall{{
-		Receiver: fake1,
 		FuncName: "aMethod",
 		Args:     []interface{}{1, 2, 3},
 	}, {
 		FuncName: "aFunc",
 		Args:     []interface{}{"arg"},
 	}, {
-		Receiver: fake1,
 		FuncName: "otherMethod",
 		Args:     []interface{}{[]string{"arg1", "arg2"}},
 	}, {
-		Receiver: fake2,
 		FuncName: "aMethod",
 	}})
+	c.Check(s.fake.Receivers, jc.DeepEquals, []interface{}{fake1, nil, fake1, fake2})
 }
 
 func (s *fakeSuite) TestSetErrorsMultiple(c *gc.C) {

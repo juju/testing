@@ -8,17 +8,8 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-// TODO(ericsnow) Drop FakeCall.Receiver? In the cases that it matters
-// it can be set as the first arg...  Still, it does make sense to treat
-// the receiver specially. Perhaps track receivers in a separate slice
-// (e.g. Fake.Receivers).
-
 // FakeCall records the name of a called function and the passed args.
 type FakeCall struct {
-	// Receiver is the fake for which the function was called. It is
-	// not required, particularly if the function is not a method.
-	Receiver interface{}
-
 	// Funcname is the name of the function that was called.
 	FuncName string
 
@@ -62,14 +53,12 @@ type FakeCall struct {
 // call the CheckCalls (or CheckCall) method:
 //
 //    c.Check(s.fake.Calls, jc.DeepEquals, []FakeCall{{
-//        Receiver: s.fake,
 //        FuncName: "Send",
 //        Args: []interface{}{
 //            expected,
 //        },
 //    }})
 //
-//    // We don't care about the receiver here.
 //    s.fake.CheckCalls(c, []FakeCall{{
 //        FuncName: "Send",
 //        Args: []interface{}{
@@ -103,6 +92,13 @@ type Fake struct {
 	// made.
 	Calls []FakeCall
 
+	// Receivers is the list of receivers for all the recorded calls.
+	// In the case of non-methods, the receiver is set to nil. The
+	// receivers are tracked here rather than as a Receiver field on
+	// FakeCall because FakeCall represents the common case for
+	// testing. Typically the receiver does not need to be checked.
+	Receivers []interface{}
+
 	// Errors holds the list of error return values to use for
 	// successive calls to methods that return an error. Each call
 	// pops the next error off the list. An empty list (the default)
@@ -131,26 +127,25 @@ func (f *Fake) NextErr() error {
 	return err
 }
 
-// AddCall records a faked function call for later inspection using the
-// CheckCalls method. In the case of methods the receiver is not
-// recorded. However, the receiver is not significant for most testing.
-// All faked functions should call AddCall (or MethodCall in the case of
-// methods).
-func (f *Fake) AddCall(funcName string, args ...interface{}) int {
+func (f *Fake) addCall(rcvr interface{}, funcName string, args []interface{}) {
 	f.Calls = append(f.Calls, FakeCall{
 		FuncName: funcName,
 		Args:     args,
 	})
-	return len(f.Calls) - 1
+	f.Receivers = append(f.Receivers, rcvr)
+}
+
+// AddCall records a faked function call for later inspection using the
+// CheckCalls method. A nil receiver is recorded. Thus for methods use
+// MethodCall. All faked functions should call AddCall.
+func (f *Fake) AddCall(funcName string, args ...interface{}) {
+	f.addCall(nil, funcName, args)
 }
 
 // MethodCall records a faked method call for later inspection using
-// the CheckCalls method. Unlike AddCall, MethodCall tracks the
-// receiver of the called method.
-func (f *Fake) MethodCall(receiver interface{}, funcName string, args ...interface{}) int {
-	index := f.AddCall(funcName, args...)
-	f.Calls[index].Receiver = receiver
-	return index
+// the CheckCalls method. The receiver is added to Fake.Receivers.
+func (f *Fake) MethodCall(receiver interface{}, funcName string, args ...interface{}) {
+	f.addCall(receiver, funcName, args)
 }
 
 // SetErrors sets the sequence of error returns for the fake. Each call
@@ -163,35 +158,12 @@ func (f *Fake) SetErrors(errors ...error) {
 
 // CheckCalls verifies that the history of calls on the fake's methods
 // matches the expected calls. The receivers are not checked. If they
-// are significant then simply compare the calls directly:
-//
-//     c.Check(s.fake.Calls, jc.DeepEquals, expected)
+// are significant then check Fake.Receivers separately.
 func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 	if !f.CheckCallNames(c, fakeCallNames(expected...)...) {
 		return
 	}
-
-	calls := copyWithoutReceivers(f.Calls)
-	expected = copyWithoutReceivers(expected)
-	c.Check(calls, jc.DeepEquals, expected)
-}
-
-func fakeCallNames(calls ...FakeCall) []string {
-	var funcNames []string
-	for _, call := range calls {
-		funcNames = append(funcNames, call.FuncName)
-	}
-	return funcNames
-}
-
-func copyWithoutReceivers(calls []FakeCall) []FakeCall {
-	copied := make([]FakeCall, len(calls), len(calls))
-	for i, call := range calls {
-		// Copy the value.
-		copied[i] = call
-		copied[i].Receiver = nil
-	}
-	return copied
+	c.Check(f.Calls, jc.DeepEquals, expected)
 }
 
 // CheckCall checks the recorded call at the given index against the
@@ -199,14 +171,13 @@ func copyWithoutReceivers(calls []FakeCall) []FakeCall {
 // The receiver is not checked. If it is significant for a test then it
 // can be checked separately:
 //
-//     c.Check(myfake.Calls[index].Receiver, gc.Equals, expected)
+//     c.Check(myfake.Receivers[index], gc.Equals, expected)
 func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{}) {
 	if !c.Check(index, jc.LessThan, len(f.Calls)) {
 		return
 	}
 	call := f.Calls[index]
 	expected := FakeCall{
-		Receiver: call.Receiver,
 		FuncName: funcName,
 		Args:     args,
 	}
@@ -218,4 +189,12 @@ func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{
 func (f *Fake) CheckCallNames(c *gc.C, expected ...string) bool {
 	funcNames := fakeCallNames(f.Calls...)
 	return c.Check(funcNames, jc.DeepEquals, expected)
+}
+
+func fakeCallNames(calls ...FakeCall) []string {
+	var funcNames []string
+	for _, call := range calls {
+		funcNames = append(funcNames, call.FuncName)
+	}
+	return funcNames
 }
