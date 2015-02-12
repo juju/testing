@@ -145,6 +145,25 @@ func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 	c.Check(f.Calls, jc.DeepEquals, expected)
 }
 
+// CheckCall checks the recorded call at the given index against the
+// provided values. If the index is out of bounds then the check fails.
+// The receiver of the call is significant for a test then it can be
+// checked separately:
+//
+//     c.Check(myfake.Calls[index].Receiver, gc.Equals, expected)
+func (f *Fake) CheckCall(c *gc.C, index uint, funcName string, args ...interface{}) {
+	if !c.Check(index, jc.LessThan, len(f.Calls)) {
+		return
+	}
+	call := f.Calls[index]
+	expected := FakeCall{
+		Receiver: call.Receiver,
+		FuncName: funcName,
+		Args:     args,
+	}
+	c.Check(call, jc.DeepEquals, expected)
+}
+
 // CheckCallNames verifies that the in-order list of called method names
 // matches the expected calls.
 func (f *Fake) CheckCallNames(c *gc.C, expected ...string) {
