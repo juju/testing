@@ -8,7 +8,9 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-// TODO(ericsnow) Drop FakeCall.Receiver?
+// TODO(ericsnow) Drop FakeCall.Receiver? In the cases that it matters
+// it can be set as the first arg...  Still, it does make sense to treat
+// the receiver specially.
 
 // FakeCall records the name of a called function and the passed args.
 type FakeCall struct {
@@ -40,8 +42,9 @@ type FakeCall struct {
 //        }
 //    }
 //
-//    func (fc fakeConn) Send(request string) []byte {
-//        fc.AddCall("Send", request)
+//    // Send implements Connection.
+//    func (fc *fakeConn) Send(request string) []byte {
+//        fc.MethodCall(fc, "Send", request)
 //        return fc.Response, fc.NextErr()
 //    }
 //
@@ -54,21 +57,39 @@ type FakeCall struct {
 // falling back to `DefaultError` when the sequence is exhausted. Thus
 // each fake method should call `NextErr` to get its error return value.
 //
-// To validate calls made to the fake in a test, call the CheckCalls
-// method:
+// To validate calls made to the fake in a test, check Fake.Calls or
+// call the CheckCalls method:
 //
+//    c.Check(s.fake.Calls, jc.DeepEquals, []FakeCall{{
+//        Receiver: s.fake,
+//        FuncName: "Send",
+//        Args: []interface{}{
+//            expected,
+//        },
+//    }})
+//
+//    // We don't care about the receiver here.
 //    s.fake.CheckCalls(c, []FakeCall{{
 //        FuncName: "Send",
 //        Args: []interface{}{
 //            expected,
 //        },
-//    }
+//    }})
 //
 // Not only is Fake useful for building a interface implementation to
 // use in testing (e.g. a network API client), it is also useful in
-// patching situations:
+// regular function patching situations:
 //
-//    s.PatchValue(&somefunc, s.fake.Send)
+//    type myFake struct {
+//        *testing.Fake
+//    }
+//
+//    func (f *myFake) SomeFunc(arg interface{}) error {
+//        f.AddCall("SomeFunc", arg)
+//        return f.NextErr()
+//    }
+//
+//    s.PatchValue(&somefunc, s.myFake.SomeFunc)
 //
 // This allows for easily monitoring the args passed to the patched
 // func, as well as controlling the return value from the func in a
@@ -92,6 +113,9 @@ type Fake struct {
 	DefaultError error
 }
 
+// TODO(ericsnow) Add something similar to NextErr for all return values
+// using reflection?
+
 // NextErr returns the error that should be returned on the nth call to
 // any method on the fake. It should be called for the error return in
 // all faked methods.
@@ -107,26 +131,25 @@ func (f *Fake) NextErr() error {
 // AddCall records a faked function call for later inspection using the
 // CheckCalls method. In the case of methods the receiver is not
 // recorded. However, the receiver is not significant for most testing.
-// All faked functions should call AddCall (or perhaps AddRcvrCall in
+// All faked functions should call AddCall (or perhaps MethodCall in
 // the case of methods).
-func (f *Fake) AddCall(funcName string, args ...interface{}) {
+func (f *Fake) AddCall(funcName string, args ...interface{}) int {
 	f.Calls = append(f.Calls, FakeCall{
 		FuncName: funcName,
 		Args:     args,
 	})
+	return len(f.Calls) - 1
 }
 
-// TODO(ericsnow) Drop AddRcvrCall (have AddCall return *FakeCall).
+// TODO(ericsnow) Drop MethodCall?
 
-// AddRcvrCall records a faked method call for later inspection using
-// the CheckCalls method. Unlike AddCall, AddRcvrCall tracks the
+// MethodCall records a faked method call for later inspection using
+// the CheckCalls method. Unlike AddCall, MethodCall tracks the
 // receiver of the called method.
-func (f *Fake) AddRcvrCall(receiver interface{}, funcName string, args ...interface{}) {
-	f.Calls = append(f.Calls, FakeCall{
-		Receiver: receiver,
-		FuncName: funcName,
-		Args:     args,
-	})
+func (f *Fake) MethodCall(receiver interface{}, funcName string, args ...interface{}) int {
+	index := f.AddCall(funcName, args...)
+	f.Calls[index].Receiver = receiver
+	return index
 }
 
 // SetErrors sets the sequence of error returns for the fake. Each call
@@ -151,7 +174,7 @@ func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 // checked separately:
 //
 //     c.Check(myfake.Calls[index].Receiver, gc.Equals, expected)
-func (f *Fake) CheckCall(c *gc.C, index uint, funcName string, args ...interface{}) {
+func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{}) {
 	if !c.Check(index, jc.LessThan, len(f.Calls)) {
 		return
 	}
