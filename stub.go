@@ -8,8 +8,8 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-// FakeCall records the name of a called function and the passed args.
-type FakeCall struct {
+// StubCall records the name of a called function and the passed args.
+type StubCall struct {
 	// Funcname is the name of the function that was called.
 	FuncName string
 
@@ -18,84 +18,84 @@ type FakeCall struct {
 	Args []interface{}
 }
 
-// Fake is used in testing to stand in for some other value, to record
-// all calls to faked methods/functions, and to allow users to set the
-// values that are returned from those calls. Fake is intended to be
+// Stub is used in testing to stand in for some other value, to record
+// all calls to stubbed methods/functions, and to allow users to set the
+// values that are returned from those calls. Stub is intended to be
 // embedded in another struct that will define the methods to track:
 //
-//    type fakeConn struct {
-//        *testing.Fake
+//    type stubConn struct {
+//        *testing.Stub
 //        Response []byte
 //    }
 //
-//    func newFakeConn() *fakeConn {
-//        return &fakeConn{
-//            Fake: &testing.Fake{},
+//    func newStubConn() *stubConn {
+//        return &stubConn{
+//            Stub: &testing.Stub{},
 //        }
 //    }
 //
 //    // Send implements Connection.
-//    func (fc *fakeConn) Send(request string) []byte {
+//    func (fc *stubConn) Send(request string) []byte {
 //        fc.MethodCall(fc, "Send", request)
 //        return fc.Response, fc.NextErr()
 //    }
 //
-// As demonstrated in the example, embed a pointer to testing.Fake. This
-// allows a single testing.Fake to be shared between multiple fakes.
+// As demonstrated in the example, embed a pointer to testing.Stub. This
+// allows a single testing.Stub to be shared between multiple stubs.
 //
-// Error return values are set through Fake.Errors. Set it to the errors
+// Error return values are set through Stub.Errors. Set it to the errors
 // you want returned (or use the convenience method `SetErrors`). The
-// `NextErr` method returns the errors from Fake.Errors in sequence,
+// `NextErr` method returns the errors from Stub.Errors in sequence,
 // falling back to `DefaultError` when the sequence is exhausted. Thus
-// each fake method should call `NextErr` to get its error return value.
+// each stubbed method should call `NextErr` to get its error return value.
 //
-// To validate calls made to the fake in a test, check Fake.Calls or
+// To validate calls made to the stub in a test, check Stub.Calls or
 // call the CheckCalls (or CheckCall) method:
 //
-//    c.Check(s.fake.Calls, jc.DeepEquals, []FakeCall{{
+//    c.Check(s.stub.Calls, jc.DeepEquals, []StubCall{{
 //        FuncName: "Send",
 //        Args: []interface{}{
 //            expected,
 //        },
 //    }})
 //
-//    s.fake.CheckCalls(c, []FakeCall{{
+//    s.stub.CheckCalls(c, []StubCall{{
 //        FuncName: "Send",
 //        Args: []interface{}{
 //            expected,
 //        },
 //    }})
 //
-//    s.fake.CheckCall(c, 0, "Send", expected)
+//    s.stub.CheckCall(c, 0, "Send", expected)
 //
-// Not only is Fake useful for building a interface implementation to
+// Not only is Stub useful for building a interface implementation to
 // use in testing (e.g. a network API client), it is also useful in
 // regular function patching situations:
 //
-//    type myFake struct {
-//        *testing.Fake
+//    type myStub struct {
+//        *testing.Stub
 //    }
 //
-//    func (f *myFake) SomeFunc(arg interface{}) error {
+//    func (f *myStub) SomeFunc(arg interface{}) error {
 //        f.AddCall("SomeFunc", arg)
 //        return f.NextErr()
 //    }
 //
-//    s.PatchValue(&somefunc, s.myFake.SomeFunc)
+//    s.PatchValue(&somefunc, s.myStub.SomeFunc)
 //
 // This allows for easily monitoring the args passed to the patched
 // func, as well as controlling the return value from the func in a
-// clean manner (by simply setting the correct fake field).
-type Fake struct {
-	// Calls is the list of calls that have been registered on the fake
-	// (i.e. made on the fake's methods), in the order that they were
+// clean manner (by simply setting the correct field on the stub).
+type Stub struct {
+	// Calls is the list of calls that have been registered on the stub
+	// (i.e. made on the stub's methods), in the order that they were
 	// made.
-	Calls []FakeCall
+	Calls []StubCall
 
 	// Receivers is the list of receivers for all the recorded calls.
 	// In the case of non-methods, the receiver is set to nil. The
 	// receivers are tracked here rather than as a Receiver field on
-	// FakeCall because FakeCall represents the common case for
+	// StubCall because StubCall represents the common case for
 	// testing. Typically the receiver does not need to be checked.
 	Receivers []interface{}
 
@@ -108,7 +108,7 @@ type Fake struct {
 	Errors []error
 
 	// DefaultError is the default error (when Errors is empty). The
-	// typical Fake usage will leave this nil (i.e. no error).
+	// typical Stub usage will leave this nil (i.e. no error).
 	DefaultError error
 }
 
@@ -116,9 +116,9 @@ type Fake struct {
 // using reflection?
 
 // NextErr returns the error that should be returned on the nth call to
-// any method on the fake. It should be called for the error return in
-// all faked methods.
-func (f *Fake) NextErr() error {
+// any method on the stub. It should be called for the error return in
+// all stubbed methods.
+func (f *Stub) NextErr() error {
 	if len(f.Errors) == 0 {
 		return f.DefaultError
 	}
@@ -127,40 +127,40 @@ func (f *Fake) NextErr() error {
 	return err
 }
 
-func (f *Fake) addCall(rcvr interface{}, funcName string, args []interface{}) {
-	f.Calls = append(f.Calls, FakeCall{
+func (f *Stub) addCall(rcvr interface{}, funcName string, args []interface{}) {
+	f.Calls = append(f.Calls, StubCall{
 		FuncName: funcName,
 		Args:     args,
 	})
 	f.Receivers = append(f.Receivers, rcvr)
 }
 
-// AddCall records a faked function call for later inspection using the
+// AddCall records a stubbed function call for later inspection using the
 // CheckCalls method. A nil receiver is recorded. Thus for methods use
-// MethodCall. All faked functions should call AddCall.
-func (f *Fake) AddCall(funcName string, args ...interface{}) {
+// MethodCall. All stubbed functions should call AddCall.
+func (f *Stub) AddCall(funcName string, args ...interface{}) {
 	f.addCall(nil, funcName, args)
 }
 
-// MethodCall records a faked method call for later inspection using
-// the CheckCalls method. The receiver is added to Fake.Receivers.
-func (f *Fake) MethodCall(receiver interface{}, funcName string, args ...interface{}) {
+// MethodCall records a stubbed method call for later inspection using
+// the CheckCalls method. The receiver is added to Stub.Receivers.
+func (f *Stub) MethodCall(receiver interface{}, funcName string, args ...interface{}) {
 	f.addCall(receiver, funcName, args)
 }
 
-// SetErrors sets the sequence of error returns for the fake. Each call
-// to Err (thus each fake method call) pops an error off the front. So
+// SetErrors sets the sequence of error returns for the stub. Each call
+// to Err (thus each stub method call) pops an error off the front. So
 // frontloading nil here will allow calls to pass, followed by a
 // failure.
-func (f *Fake) SetErrors(errors ...error) {
+func (f *Stub) SetErrors(errors ...error) {
 	f.Errors = errors
 }
 
-// CheckCalls verifies that the history of calls on the fake's methods
+// CheckCalls verifies that the history of calls on the stub's methods
 // matches the expected calls. The receivers are not checked. If they
-// are significant then check Fake.Receivers separately.
-func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
-	if !f.CheckCallNames(c, fakeCallNames(expected...)...) {
+// are significant then check Stub.Receivers separately.
+func (f *Stub) CheckCalls(c *gc.C, expected []StubCall) {
+	if !f.CheckCallNames(c, stubCallNames(expected...)...) {
 		return
 	}
 	c.Check(f.Calls, jc.DeepEquals, expected)
@@ -171,13 +171,13 @@ func (f *Fake) CheckCalls(c *gc.C, expected []FakeCall) {
 // The receiver is not checked. If it is significant for a test then it
 // can be checked separately:
 //
-//     c.Check(myfake.Receivers[index], gc.Equals, expected)
-func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{}) {
+//     c.Check(mystub.Receivers[index], gc.Equals, expected)
+func (f *Stub) CheckCall(c *gc.C, index int, funcName string, args ...interface{}) {
 	if !c.Check(index, jc.LessThan, len(f.Calls)) {
 		return
 	}
 	call := f.Calls[index]
-	expected := FakeCall{
+	expected := StubCall{
 		FuncName: funcName,
 		Args:     args,
 	}
@@ -186,12 +186,12 @@ func (f *Fake) CheckCall(c *gc.C, index int, funcName string, args ...interface{
 
 // CheckCallNames verifies that the in-order list of called method names
 // matches the expected calls.
-func (f *Fake) CheckCallNames(c *gc.C, expected ...string) bool {
-	funcNames := fakeCallNames(f.Calls...)
+func (f *Stub) CheckCallNames(c *gc.C, expected ...string) bool {
+	funcNames := stubCallNames(f.Calls...)
 	return c.Check(funcNames, jc.DeepEquals, expected)
 }
 
-func fakeCallNames(calls ...FakeCall) []string {
+func stubCallNames(calls ...StubCall) []string {
 	var funcNames []string
 	for _, call := range calls {
 		funcNames = append(funcNames, call.FuncName)
