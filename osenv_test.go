@@ -5,6 +5,7 @@ package testing_test
 
 import (
 	"os"
+	"runtime"
 
 	gc "gopkg.in/check.v1"
 
@@ -41,4 +42,55 @@ func (s *osEnvSuite) TestTestingEnvironment(c *gc.C) {
 	s.osEnvSuite.TearDownTest(c)
 	s.osEnvSuite.TearDownSuite(c)
 	c.Assert(os.Getenv("TESTING_OSENV_NEW"), gc.Equals, "")
+}
+
+func (s *osEnvSuite) TestPreservesTestingVariables(c *gc.C) {
+	err := os.Setenv("JUJU_MONGOD", "preserved-value")
+	c.Assert(err, gc.IsNil)
+	s.osEnvSuite.SetUpSuite(c)
+	s.osEnvSuite.SetUpTest(c)
+	c.Assert(os.Getenv("JUJU_MONGOD"), gc.Equals, "preserved-value")
+	c.Assert(err, gc.IsNil)
+	s.osEnvSuite.TearDownTest(c)
+	s.osEnvSuite.TearDownSuite(c)
+	c.Assert(os.Getenv("JUJU_MONGOD"), gc.Equals, "preserved-value")
+}
+
+func (s *osEnvSuite) TestRestoresTestingVariables(c *gc.C) {
+	os.Clearenv()
+	s.osEnvSuite.SetUpSuite(c)
+	s.osEnvSuite.SetUpTest(c)
+	err := os.Setenv("JUJU_MONGOD", "test-value")
+	c.Assert(err, gc.IsNil)
+	s.osEnvSuite.TearDownTest(c)
+	s.osEnvSuite.TearDownSuite(c)
+	c.Assert(os.Getenv("JUJU_MONGOD"), gc.Equals, "")
+}
+
+func (s *osEnvSuite) TestWindowsPreservesPath(c *gc.C) {
+	if runtime.GOOS != "windows" {
+		c.Skip("Windows-specific test case")
+	}
+	err := os.Setenv("PATH", "/new/path")
+	c.Assert(err, gc.IsNil)
+	s.osEnvSuite.SetUpSuite(c)
+	s.osEnvSuite.SetUpTest(c)
+	c.Assert(os.Getenv("PATH"), gc.Equals, "/new/path")
+	s.osEnvSuite.TearDownTest(c)
+	s.osEnvSuite.TearDownSuite(c)
+	c.Assert(os.Getenv("PATH"), gc.Equals, "/new/path")
+}
+
+func (s *osEnvSuite) TestWindowsRestoresPath(c *gc.C) {
+	if runtime.GOOS != "windows" {
+		c.Skip("Windows-specific test case")
+	}
+	os.Clearenv()
+	s.osEnvSuite.SetUpSuite(c)
+	s.osEnvSuite.SetUpTest(c)
+	err := os.Setenv("PATH", "/test/path")
+	c.Assert(err, gc.IsNil)
+	s.osEnvSuite.TearDownTest(c)
+	s.osEnvSuite.TearDownSuite(c)
+	c.Assert(os.Getenv("PATH"), gc.Equals, "")
 }
