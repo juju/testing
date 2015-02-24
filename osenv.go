@@ -67,16 +67,35 @@ var testingVariables = []string{
 }
 
 func (s *OsEnvSuite) setEnviron() {
-	var envList []string
+	var isWhitelisted func (string) bool
 	switch runtime.GOOS {
 	case "windows":
-		envList = windowsVariables
+		// Lowercase variable names for comparison as they are case
+		// insenstive on windows. Fancy folding not required for ascii.
+		lowerEnv := make(map[string]struct{},
+			len(windowsVariables) + len(testingVariables))
+		for _, envVar := range windowsVariables {
+			lowerEnv[strings.ToLower(envVar)] = struct{}{}
+		}
+		for _, envVar := range testingVariables {
+			lowerEnv[strings.ToLower(envVar)] = struct{}{}
+		}
+		isWhitelisted = func (envVar string) bool {
+			_, ok := lowerEnv[strings.ToLower(envVar)]
+			return ok
+		}
 	default:
-		envList = []string{}
+		isWhitelisted = func (envVar string) bool {
+			for _, testingVar := range testingVariables {
+				if testingVar == envVar {
+					return true
+				}
+			}
+			return false
+		}
 	}
-	envList = append(envList, testingVariables...)
-	for _, envVar := range envList {
-		if value, ok := s.oldEnvironment[envVar]; ok {
+	for envVar, value := range s.oldEnvironment {
+		if isWhitelisted(envVar) {
 			os.Setenv(envVar, value)
 		}
 	}
@@ -86,7 +105,7 @@ func (s *OsEnvSuite) setEnviron() {
 // with whitelisted values previously saved in s.oldEnvironment
 func (s *OsEnvSuite) osDependendClearenv() {
 	os.Clearenv()
-	// Currently, this will only do something if we are running on windows
+	// Restore any platform required or juju testing variables.
 	s.setEnviron()
 }
 
