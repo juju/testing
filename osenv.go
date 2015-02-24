@@ -72,12 +72,13 @@ func (s *OsEnvSuite) setEnviron() {
 	case "windows":
 		// Lowercase variable names for comparison as they are case
 		// insenstive on windows. Fancy folding not required for ascii.
-		lowerEnv := make(map[string]string)
+		lowerEnv := make(map[string]struct{},
+			len(windowsVariables) + len(testingVariables))
 		for _, envVar := range windowsVariables {
-			lowerEnv[strings.ToLower(envVar)] = envVar
+			lowerEnv[strings.ToLower(envVar)] = struct{}{}
 		}
 		for _, envVar := range testingVariables {
-			lowerEnv[strings.ToLower(envVar)] = envVar
+			lowerEnv[strings.ToLower(envVar)] = struct{}{}
 		}
 		isWhitelisted = func (envVar string) bool {
 			_, ok := lowerEnv[strings.ToLower(envVar)]
