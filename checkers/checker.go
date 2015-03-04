@@ -195,9 +195,10 @@ func (checker *sameContents) Check(params []interface{}, names []string) (result
 	mexp := make(map[interface{}]int, length)
 
 	for i := 0; i < length; i++ {
-		mexp[vexp.Index(i).Interface()]++
-		mob[vob.Index(i).Interface()]++
+		mexp[reflect.Indirect(vexp.Index(i)).Interface()]++
+		mob[reflect.Indirect(vob.Index(i)).Interface()]++
 	}
+
 	return reflect.DeepEqual(mob, mexp), ""
 }
 
