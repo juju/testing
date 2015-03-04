@@ -145,6 +145,20 @@ func (checker *containsChecker) Check(params []interface{}, names []string) (res
 	return false, "Obtained value is not a string and has no .String()"
 }
 
+type sameContentsDeref struct {
+	*gc.CheckerInfo
+}
+
+// SameContentsDeref dereferences every item in obtained and expected before performing
+// the same check as SameContents
+var SameContentsDeref gc.Checker = &sameContentsDeref{
+	&gc.CheckerInfo{Name: "SameContentsDeref", Params: []string{"obtained", "expected"}},
+}
+
+func (checker *sameContentsDeref) Check(params []interface{}, names []string) (result bool, error string) {
+	return checkSameContents(params, names, true)
+}
+
 type sameContents struct {
 	*gc.CheckerInfo
 }
@@ -157,6 +171,10 @@ var SameContents gc.Checker = &sameContents{
 }
 
 func (checker *sameContents) Check(params []interface{}, names []string) (result bool, error string) {
+	return checkSameContents(params, names, false)
+}
+
+func checkSameContents(params []interface{}, names []string, deref bool) (result bool, error string) {
 	if len(params) != 2 {
 		return false, "SameContents expects two slice arguments"
 	}
@@ -194,9 +212,16 @@ func (checker *sameContents) Check(params []interface{}, names []string) (result
 	mob := make(map[interface{}]int, length)
 	mexp := make(map[interface{}]int, length)
 
-	for i := 0; i < length; i++ {
-		mexp[vexp.Index(i).Interface()]++
-		mob[vob.Index(i).Interface()]++
+	if deref {
+		for i := 0; i < length; i++ {
+			mexp[reflect.Indirect(vexp.Index(i)).Interface()]++
+			mob[reflect.Indirect(vob.Index(i)).Interface()]++
+		}
+	} else {
+		for i := 0; i < length; i++ {
+			mexp[vexp.Index(i).Interface()]++
+			mob[vob.Index(i).Interface()]++
+		}
 	}
 	return reflect.DeepEqual(mob, mexp), ""
 }
