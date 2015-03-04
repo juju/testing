@@ -67,6 +67,10 @@ func (s *CheckerSuite) TestTimeBetween(c *gc.C) {
 	checkFails(42, now, earlier, `obtained value type must be time.Time`)
 }
 
+type someStruct struct {
+	a uint
+}
+
 func (s *CheckerSuite) TestSameContents(c *gc.C) {
 	//// positive cases ////
 
@@ -121,6 +125,54 @@ func (s *CheckerSuite) TestSameContents(c *gc.C) {
 	c.Check(
 		[]int{1, 1, 2}, gc.Not(jc.SameContents),
 		[]int{1, 2, 2})
+
+	// Tests that check that we compare the contents of structs,
+	// that we point to, not just the pointers to them.
+	a1 := someStruct{1}
+	a2 := someStruct{2}
+	a3 := someStruct{3}
+	b1 := someStruct{1}
+	b2 := someStruct{2}
+	// Same order, same contents
+	c.Check(
+		[]*someStruct{&a1, &a2}, jc.SameContents,
+		[]*someStruct{&b1, &b2})
+
+	// Empty vs not
+	c.Check(
+		[]*someStruct{&a1, &a2}, gc.Not(jc.SameContents),
+		[]*someStruct{})
+
+	// Empty vs empty
+	// Same order, same contents
+	c.Check(
+		[]*someStruct{}, jc.SameContents,
+		[]*someStruct{})
+
+	// Different order, same contents
+	c.Check(
+		[]*someStruct{&a1, &a2}, jc.SameContents,
+		[]*someStruct{&b2, &b1})
+
+	// different contents
+	c.Check(
+		[]*someStruct{&a3, &a2}, gc.Not(jc.SameContents),
+		[]*someStruct{&b2, &b1})
+
+	// Different sizes, same contents (duplicate item)
+	c.Check(
+		[]*someStruct{&a1, &a2, &a1}, gc.Not(jc.SameContents),
+		[]*someStruct{&b2, &b1})
+
+	// Different sizes, same contents
+	c.Check(
+		[]*someStruct{&a1, &a1, &a2}, gc.Not(jc.SameContents),
+		[]*someStruct{&b2, &b1})
+
+	// Same sizes, same contents, different quantities
+	c.Check(
+		[]*someStruct{&a1, &a2, &a2}, gc.Not(jc.SameContents),
+		[]*someStruct{&b1, &b1, &b2})
 
 	/// Error cases ///
 	//  note: for these tests, we can't use gc.Not, since Not passes the error value through
