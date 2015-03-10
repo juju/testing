@@ -32,8 +32,9 @@ import (
 
 var (
 	// MgoServer is a shared mongo server used by tests.
-	MgoServer = &MgoInstance{}
-	logger    = loggo.GetLogger("juju.testing")
+	MgoServer MgoInstance
+
+	logger = loggo.GetLogger("juju.testing")
 
 	// regular expression to match output of mongod
 	waitingForConnectionsRe = regexp.MustCompile(".*initandlisten.*waiting for connections.*")
@@ -265,10 +266,10 @@ func (inst *MgoInstance) run() error {
 		}
 		// Capture the last 20 lines of output from mongod, to log
 		// in the event of unclean exit.
-		lines := readLastLines(prefix, io.MultiReader(&buf, out), 20)
-		err = server.Wait()
-		exitErr, _ := err.(*exec.ExitError)
-		if err == nil || exitErr != nil && exitErr.Exited() {
+		lines, err1 := readLastLines(prefix, io.MultiReader(&buf, out), 20)
+		err2 := server.Wait()
+		exitErr, _ := err2.(*exec.ExitError)
+		if err1 != nil || err2 == nil || exitErr != nil && exitErr.Exited() {
 			// mongodb has exited without being killed, so print the
 			// last few lines of its log output.
 			logger.Errorf("mongodb has exited without being killed")
@@ -378,19 +379,16 @@ func readUntilMatching(prefix string, r io.Reader, re *regexp.Regexp) bool {
 
 // readLastLines reads lines from the given reader and returns
 // the last n non-empty lines, ignoring empty lines.
-func readLastLines(prefix string, r io.Reader, n int) []string {
+func readLastLines(prefix string, r io.Reader, n int) ([]string, error) {
 	sc := bufio.NewScanner(r)
 	lines := make([]string, n)
 	i := 0
 	for sc.Scan() {
-		if line := strings.TrimRight(sc.Text(), "\n"); line != "" {
+		if line := sc.Text(); line != "" {
 			logger.Tracef("%s: %s", prefix, line)
 			lines[i%n] = line
 			i++
 		}
-	}
-	if err := sc.Err(); err != nil {
-		panic(err)
 	}
 	final := make([]string, 0, n+1)
 	if i > n {
@@ -401,7 +399,7 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 			final = append(final, line)
 		}
 	}
-	return final
+	return final, sc.Err()
 }
 
 func (s *MgoSuite) TearDownSuite(c *gc.C) {
