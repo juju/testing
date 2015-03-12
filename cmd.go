@@ -117,7 +117,7 @@ func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, e
 			codes[i] = strconv.Itoa(code)
 		}
 		s := strings.Join(codes, ";") + ";"
-		err = ioutil.WriteFile(filename, []byte(s), 644)
+		err = ioutil.WriteFile(filename, []byte(s), 0644)
 		c.Assert(err, gc.IsNil)
 		patcher.AddCleanup(func(*gc.C) {
 			os.Remove(filename)
