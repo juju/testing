@@ -4,13 +4,14 @@
 package testing
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 
 	gc "gopkg.in/check.v1"
 )
@@ -69,11 +70,21 @@ for %%x in (%*) do (
    set /A argCount+=1
    set "argVec[!argCount!]=%%~x"
 )
-
 for /L %%i in (1,1,%argCount%) do set list=!list! "!argVec[%%i]!"
 
-echo %list%
+IF exist %0.exitcodes (
+    FOR /F "tokens=1* delims=;" %%i IN (%0.exitcodes) DO (
+        set exitcode=%%i
+        IF NOT [%%j]==[] (
+            echo %%j > %0.exitcodes
+        ) ELSE (
+            del %0.exitcodes
+        )
+    )
+)
+
 echo %list%>> %0.out
+exit /B %exitcode%
 `
 )
 
@@ -101,10 +112,11 @@ func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, e
 
 	if len(exitCodes) > 0 {
 		filename = execName + ".exitcodes"
-		s := ""
-		for _, exitCode := range exitCodes {
-			s += fmt.Sprintf("%v;", exitCode)
+		codes := make([]string, len(exitCodes))
+		for i, code := range exitCodes {
+			codes[i] = strconv.Itoa(code)
 		}
+		s := strings.Join(codes, ";") + ";"
 		err = ioutil.WriteFile(filename, []byte(s), 0755)
 		c.Assert(err, gc.IsNil)
 		patcher.AddCleanup(func(*gc.C) {
@@ -164,15 +176,9 @@ func PatchExecutableAsEchoArgs(c *gc.C, patcher CleanupPatcher, execName string,
 // that has been patchec using PatchExecutable containing EchoQuotedArgs.
 func AssertEchoArgs(c *gc.C, execName string, args ...string) {
 	// Read in entire argument log file
-	file, err := os.Open(execName + ".out")
+	content, err := ioutil.ReadFile(execName + ".out")
 	c.Assert(err, gc.IsNil)
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	var lines []string
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	c.Assert(scanner.Err(), gc.IsNil)
+	lines := strings.Split(string(content), "\n")
 
 	// Create expected output string
 	expected := execName
@@ -182,17 +188,8 @@ func AssertEchoArgs(c *gc.C, execName string, args ...string) {
 
 	// Check that the expected and the first line of actual output are the same
 	c.Assert(lines[0], gc.Equals, expected)
-	file.Close()
 
 	// Write out the remaining lines for the next check
-	file, err = os.Create(execName + ".out")
-	c.Assert(err, gc.IsNil)
-	defer file.Close()
-	w := bufio.NewWriter(file)
-	if len(lines) > 1 {
-		for _, line := range lines[1:] {
-			fmt.Fprintln(w, line)
-		}
-	}
-	w.Flush()
+	content = []byte(strings.Join(lines[1:], "\n"))
+	err = ioutil.WriteFile(execName+".out", content, 0644) // or just call this filename somewhere, once.
 }
