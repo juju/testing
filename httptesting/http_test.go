@@ -13,6 +13,7 @@ import (
 
 	gc "gopkg.in/check.v1"
 
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 )
 
@@ -158,6 +159,24 @@ func (*requestsSuite) TestAssertJSONCall(c *gc.C) {
 		params.ExpectBody = expectBody
 		httptesting.AssertJSONCall(c, params)
 	}
+}
+
+func (*requestsSuite) TestAssertJSONCallWithBodyAsserter(c *gc.C) {
+	called := false
+	params := httptesting.JSONCallParams{
+		URL:     "/",
+		Handler: makeHandler(c, http.StatusOK, "application/json"),
+		ExpectBody: httptesting.BodyAsserter(func(c1 *gc.C, body json.RawMessage) {
+			c.Assert(c1, gc.Equals, c)
+			c.Assert(string(body), jc.JSONEquals, handlerResponse{
+				URL:    "/",
+				Method: "GET",
+			})
+			called = true
+		}),
+	}
+	httptesting.AssertJSONCall(c, params)
+	c.Assert(called, gc.Equals, true)
 }
 
 // The TestAssertJSONCall above exercises the testing.AssertJSONCall succeeding
