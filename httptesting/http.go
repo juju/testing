@@ -5,6 +5,7 @@ package httptesting
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,10 @@ import (
 
 	jc "github.com/juju/testing/checkers"
 )
+
+// BodyAsserter represents a function that can assert the correctness of
+// a JSON reponse.
+type BodyAsserter func(c *gc.C, body json.RawMessage)
 
 // JSONCallParams holds parameters for AssertJSONCall.
 // If left empty, some fields will automatically be filled with defaults.
@@ -60,6 +65,9 @@ type JSONCallParams struct {
 	ExpectStatus int
 
 	// ExpectBody holds the expected JSON body.
+	// This may be a function of type BodyAsserter in which case it
+	// will be called with the http response body to check the
+	// result.
 	ExpectBody interface{}
 
 	// Cookies, if specified, are added to the request.
@@ -92,8 +100,10 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 	AssertJSONResponse(c, rec, p.ExpectStatus, p.ExpectBody)
 }
 
-// AssertJSONResponse asserts that the given response recorder has recorded the
-// given HTTP status, response body and content type.
+// AssertJSONResponse asserts that the given response recorder has
+// recorded the given HTTP status, response body and content type. If
+// expectBody is of type BodyAsserter it will be called with the response
+// body to ensure the response is correct.
 func AssertJSONResponse(c *gc.C, rec *httptest.ResponseRecorder, expectStatus int, expectBody interface{}) {
 	c.Assert(rec.Code, gc.Equals, expectStatus, gc.Commentf("body: %s", rec.Body.Bytes()))
 
@@ -103,6 +113,13 @@ func AssertJSONResponse(c *gc.C, rec *httptest.ResponseRecorder, expectStatus in
 		return
 	}
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "application/json")
+	if assertBody, ok := expectBody.(BodyAsserter); ok {
+		var data json.RawMessage
+		err := json.Unmarshal(rec.Body.Bytes(), &data)
+		c.Assert(err, gc.IsNil, gc.Commentf("body: %s", rec.Body.Bytes()))
+		assertBody(c, data)
+		return
+	}
 	c.Assert(rec.Body.String(), jc.JSONEquals, expectBody)
 }
 
