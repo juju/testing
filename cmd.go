@@ -187,7 +187,8 @@ func AssertEchoArgs(c *gc.C, execName string, args ...string) {
 	}
 
 	// Check that the expected and the first line of actual output are the same
-	c.Assert(lines[0], gc.Equals, expected)
+	actual := strings.TrimSuffix(lines[0], "\r")
+	c.Assert(actual, gc.Equals, expected)
 
 	// Write out the remaining lines for the next check
 	content = []byte(strings.Join(lines[1:], "\n"))
