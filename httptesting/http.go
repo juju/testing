@@ -42,6 +42,12 @@ type JSONCallParams struct {
 	// URL holds the URL to pass when making the request.
 	URL string
 
+	// JSONBody specifies a JSON value to marshal to use
+	// as the body of the request. If this is specified, Body will
+	// be ignored and the Content-Type header will
+	// be set to application/json.
+	JSONBody interface{}
+
 	// Body holds the body to send in the request.
 	Body io.Reader
 
@@ -88,6 +94,7 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 		Method:        p.Method,
 		URL:           p.URL,
 		Body:          p.Body,
+		JSONBody:      p.JSONBody,
 		Header:        p.Header,
 		ContentLength: p.ContentLength,
 		Username:      p.Username,
@@ -116,7 +123,7 @@ func AssertJSONResponse(c *gc.C, rec *httptest.ResponseRecorder, expectStatus in
 	if assertBody, ok := expectBody.(BodyAsserter); ok {
 		var data json.RawMessage
 		err := json.Unmarshal(rec.Body.Bytes(), &data)
-		c.Assert(err, gc.IsNil, gc.Commentf("body: %s", rec.Body.Bytes()))
+		c.Assert(err, jc.ErrorIsNil, gc.Commentf("body: %s", rec.Body.Bytes()))
 		assertBody(c, data)
 		return
 	}
@@ -145,6 +152,12 @@ type DoRequestParams struct {
 
 	// URL holds the URL to pass when making the request.
 	URL string
+
+	// JSONBody specifies a JSON value to marshal to use
+	// as the body of the request. If this is specified, Body will
+	// be ignored and the Content-Type header will
+	// be set to application/json.
+	JSONBody interface{}
 
 	// Body holds the body to send in the request.
 	Body io.Reader
@@ -180,10 +193,18 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	srv := httptest.NewServer(p.Handler)
 	defer srv.Close()
 
+	if p.JSONBody != nil {
+		data, err := json.Marshal(p.JSONBody)
+		c.Assert(err, jc.ErrorIsNil)
+		p.Body = bytes.NewReader(data)
+	}
 	req, err := http.NewRequest(p.Method, srv.URL+p.URL, p.Body)
-	c.Assert(err, gc.IsNil)
-	if p.Header != nil {
-		req.Header = p.Header
+	c.Assert(err, jc.ErrorIsNil)
+	if p.JSONBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for key, val := range p.Header {
+		req.Header[key] = val
 	}
 	if p.ContentLength != 0 {
 		req.ContentLength = p.ContentLength
@@ -199,7 +220,7 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 		c.Assert(err, gc.ErrorMatches, p.ExpectError)
 		return nil
 	}
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, jc.ErrorIsNil)
 	defer resp.Body.Close()
 
 	// TODO(rog) don't return a ResponseRecorder because we're not actually
@@ -209,6 +230,6 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	rec.Code = resp.StatusCode
 	rec.Body = new(bytes.Buffer)
 	_, err = io.Copy(rec.Body, resp.Body)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, jc.ErrorIsNil)
 	return &rec
 }
