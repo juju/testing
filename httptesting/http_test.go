@@ -27,26 +27,31 @@ type handlerResponse struct {
 	Method string
 	Body   string
 	Auth   bool
+	Header http.Header
 }
 
 func makeHandler(c *gc.C, status int, ctype string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
-		c.Assert(err, gc.IsNil)
-
+		c.Assert(err, jc.ErrorIsNil)
+		hasAuth := req.Header.Get("Authorization") != ""
+		for _, h := range []string{"User-Agent", "Content-Length", "Accept-Encoding", "Authorization"} {
+			delete(req.Header, h)
+		}
 		// Create the response.
 		response := handlerResponse{
 			URL:    req.URL.String(),
 			Method: req.Method,
 			Body:   string(body),
-			Auth:   req.Header.Get("Authorization") != "",
+			Header: req.Header,
+			Auth:   hasAuth,
 		}
 		// Write the response.
 		w.Header().Set("Content-Type", ctype)
 		w.WriteHeader(status)
 		enc := json.NewEncoder(w)
 		err = enc.Encode(response)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, jc.ErrorIsNil)
 	})
 }
 
@@ -70,6 +75,23 @@ var assertJSONCallTests = []struct {
 		Method: "POST",
 		URL:    "/my/url",
 		Body:   strings.NewReader("request body"),
+	},
+}, {
+	about: "GET request with custom headers",
+	params: httptesting.JSONCallParams{
+		Method: "GET",
+		URL:    "/my/url",
+		Header: http.Header{
+			"Custom1": {"header1", "header2"},
+			"Custom2": {"foo"},
+		},
+	},
+}, {
+	about: "POST request with a JSON body",
+	params: httptesting.JSONCallParams{
+		Method:   "POST",
+		URL:      "/my/url",
+		JSONBody: map[string]int{"hello": 99},
 	},
 }, {
 	about: "authentication",
@@ -137,17 +159,29 @@ func (*requestsSuite) TestAssertJSONCall(c *gc.C) {
 		expectBody := handlerResponse{
 			URL:    params.URL,
 			Method: params.Method,
+			Header: params.Header,
 		}
 
 		// A missing method is assumed to be "GET".
 		if expectBody.Method == "" {
 			expectBody.Method = "GET"
 		}
-
-		// Handle the request body parameter.
-		if params.Body != nil {
+		expectBody.Header = make(http.Header)
+		if params.JSONBody != nil {
+			expectBody.Header.Set("Content-Type", "application/json")
+		}
+		for k, v := range params.Header {
+			expectBody.Header[k] = v
+		}
+		if params.JSONBody != nil {
+			data, err := json.Marshal(params.JSONBody)
+			c.Assert(err, jc.ErrorIsNil)
+			expectBody.Body = string(data)
+			params.Body = bytes.NewReader(data)
+		} else if params.Body != nil {
+			// Handle the request body parameter.
 			body, err := ioutil.ReadAll(params.Body)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, jc.ErrorIsNil)
 			expectBody.Body = string(body)
 			params.Body = bytes.NewReader(body)
 		}
@@ -171,6 +205,7 @@ func (*requestsSuite) TestAssertJSONCallWithBodyAsserter(c *gc.C) {
 			c.Assert(string(body), jc.JSONEquals, handlerResponse{
 				URL:    "/",
 				Method: "GET",
+				Header: make(http.Header),
 			})
 			called = true
 		}),
