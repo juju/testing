@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 
@@ -24,7 +25,9 @@ type BodyAsserter func(c *gc.C, body json.RawMessage)
 type JSONCallParams struct {
 	// Do is used to make the HTTP request.
 	// If it is nil, http.DefaultClient.Do will be used.
-	Do func(*http.Request) (*http.Response, error)
+	// If the body reader implements io.Seeker,
+	// req.Body will also implement that interface.
+	Do func(req *http.Request) (*http.Response, error)
 
 	// ExpectError holds the error regexp to match
 	// against the error returned from the HTTP Do
@@ -45,7 +48,8 @@ type JSONCallParams struct {
 	// JSONBody specifies a JSON value to marshal to use
 	// as the body of the request. If this is specified, Body will
 	// be ignored and the Content-Type header will
-	// be set to application/json.
+	// be set to application/json. The request
+	// body will implement io.Seeker.
 	JSONBody interface{}
 
 	// Body holds the body to send in the request.
@@ -135,7 +139,9 @@ func AssertJSONResponse(c *gc.C, rec *httptest.ResponseRecorder, expectStatus in
 type DoRequestParams struct {
 	// Do is used to make the HTTP request.
 	// If it is nil, http.DefaultClient.Do will be used.
-	Do func(*http.Request) (*http.Response, error)
+	// If the body reader implements io.Seeker,
+	// req.Body will also implement that interface.
+	Do func(req *http.Request) (*http.Response, error)
 
 	// ExpectError holds the error regexp to match
 	// against the error returned from the HTTP Do
@@ -156,7 +162,8 @@ type DoRequestParams struct {
 	// JSONBody specifies a JSON value to marshal to use
 	// as the body of the request. If this is specified, Body will
 	// be ignored and the Content-Type header will
-	// be set to application/json.
+	// be set to application/json. The request
+	// body will implement io.Seeker.
 	JSONBody interface{}
 
 	// Body holds the body to send in the request.
@@ -198,7 +205,9 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 		c.Assert(err, jc.ErrorIsNil)
 		p.Body = bytes.NewReader(data)
 	}
-	req, err := http.NewRequest(p.Method, srv.URL+p.URL, p.Body)
+	// Note: we avoid NewRequest's odious reader wrapping by using
+	// a custom nopCloser function.
+	req, err := http.NewRequest(p.Method, srv.URL+p.URL, nopCloser(p.Body))
 	c.Assert(err, jc.ErrorIsNil)
 	if p.JSONBody != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -232,4 +241,30 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	_, err = io.Copy(rec.Body, resp.Body)
 	c.Assert(err, jc.ErrorIsNil)
 	return &rec
+}
+
+// nopCloser is like ioutil.NopCloser except that
+// the returned value implements io.Seeker if
+// r implements io.Seeker
+func nopCloser(r io.Reader) io.ReadCloser {
+	if r == nil {
+		return nil
+	}
+	rc, ok := r.(io.ReadCloser)
+	if ok {
+		return rc
+	}
+	rs, ok := r.(io.ReadSeeker)
+	if ok {
+		return readSeekNopCloser{rs}
+	}
+	return ioutil.NopCloser(r)
+}
+
+type readSeekNopCloser struct {
+	io.ReadSeeker
+}
+
+func (readSeekNopCloser) Close() error {
+	return nil
 }
