@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -115,6 +116,33 @@ var assertJSONCallTests = []struct {
 		ExpectStatus: http.StatusTeapot,
 		Do: func(req *http.Request) (*http.Response, error) {
 			resp, err := http.DefaultClient.Do(req)
+			resp.StatusCode = http.StatusTeapot
+			return resp, err
+		},
+	},
+}, {
+	about: "custom Do with seekable JSON body",
+	params: httptesting.JSONCallParams{
+		URL:          "/",
+		ExpectStatus: http.StatusTeapot,
+		JSONBody:     123,
+		Do: func(req *http.Request) (*http.Response, error) {
+			r, ok := req.Body.(io.ReadSeeker)
+			if !ok {
+				return nil, fmt.Errorf("body is not seeker")
+			}
+			data, err := ioutil.ReadAll(r)
+			if err != nil {
+				panic(err)
+			}
+			if string(data) != "123" {
+				panic(fmt.Errorf(`unexpected body content, got %q want "123"`, data))
+			}
+			r.Seek(0, 0)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return nil, err
+			}
 			resp.StatusCode = http.StatusTeapot
 			return resp, err
 		},
