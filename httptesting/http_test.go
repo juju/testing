@@ -242,6 +242,34 @@ func (*requestsSuite) TestAssertJSONCallWithBodyAsserter(c *gc.C) {
 	c.Assert(called, gc.Equals, true)
 }
 
+var bodyReaderFuncs = []func(string) io.Reader{
+	func(s string) io.Reader {
+		return strings.NewReader(s)
+	},
+	func(s string) io.Reader {
+		return bytes.NewBufferString(s)
+	},
+	func(s string) io.Reader {
+		return bytes.NewReader([]byte(s))
+	},
+}
+
+func (*requestsSuite) TestDoRequestWithInferrableContentLength(c *gc.C) {
+	text := "hello, world"
+	for i, f := range bodyReaderFuncs {
+		c.Logf("test %d", i)
+		called := false
+		httptesting.DoRequest(c, httptesting.DoRequestParams{
+			Handler: http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+				c.Check(req.ContentLength, gc.Equals, int64(len(text)))
+				called = true
+			}),
+			Body: f(text),
+		})
+		c.Assert(called, gc.Equals, true)
+	}
+}
+
 // The TestAssertJSONCall above exercises the testing.AssertJSONCall succeeding
 // calls. Failures are already massively tested in practice. DoRequest and
 // AssertJSONResponse are also indirectly tested as they are called by

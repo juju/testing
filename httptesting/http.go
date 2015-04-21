@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	gc "gopkg.in/check.v1"
 
@@ -217,6 +218,8 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	}
 	if p.ContentLength != 0 {
 		req.ContentLength = p.ContentLength
+	} else {
+		req.ContentLength = bodyContentLength(p.Body)
 	}
 	if p.Username != "" || p.Password != "" {
 		req.SetBasicAuth(p.Username, p.Password)
@@ -241,6 +244,25 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	_, err = io.Copy(rec.Body, resp.Body)
 	c.Assert(err, jc.ErrorIsNil)
 	return &rec
+}
+
+// bodyContentLength returns the Content-Length
+// to use for the given body. Usually http.NewRequest
+// would infer this (and the cases here come directly
+// from the logic in that function) but unfortunately
+// there's no way to avoid the NopCloser wrapping
+// for any of the types mentioned here.
+func bodyContentLength(body io.Reader) int64 {
+	n := 0
+	switch v := body.(type) {
+	case *bytes.Buffer:
+		n = v.Len()
+	case *bytes.Reader:
+		n = v.Len()
+	case *strings.Reader:
+		n = v.Len()
+	}
+	return int64(n)
 }
 
 // nopCloser is like ioutil.NopCloser except that
