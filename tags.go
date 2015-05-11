@@ -126,8 +126,8 @@ func CheckTag(tags ...string) bool {
 // case the check automatically fails. This is equivalent to OR'ing the
 // parsed tags.
 func MatchTag(requiredTags []string, tags ...string) string {
-	for _, tag := range tags {
-		for _, required := range requiredTags {
+	for _, required := range requiredTags {
+		for _, tag := range tags {
 			if required == "" {
 				continue
 			}
