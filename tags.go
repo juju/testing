@@ -12,6 +12,22 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
+// The following code provides a mechanism by which tests may be tagged.
+// When thus tagged, a test will only run when one of the tags specified
+// at the commandline matches (and doesn't match an excluded tag). The
+// commandline usage looks like this:
+//
+//  go test . --tags small,medium,-functional
+//
+// This would result in running only the tests that are tagged as small
+// or medium or that are not tagged as functional. The first match wins,
+// so a medium test would match even if it is tagged as functional.
+//
+// As a convienced, there is a dedicated commandline flag for tests that
+// run very quickly as a sanity check of the code:
+//
+//  go test . --smoke
+
 // These are generally useful tags to use in tests.
 const (
 	TagBase       = "base"
@@ -68,7 +84,7 @@ func parseTags(rawList ...string) []string {
 }
 
 // CheckTag determines whether or not any of the given tags were passed
-// in at the commandline.
+// in at the commandline. Matches on "excluded" tags automatically fail.
 func CheckTag(tags ...string) bool {
 	return MatchTag(tags...) != ""
 }
