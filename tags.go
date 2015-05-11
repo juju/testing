@@ -23,17 +23,26 @@ import (
 // or medium or that are not tagged as functional. The first match wins,
 // so a medium test would match even if it is tagged as functional.
 //
-// As a convienced, there is a dedicated commandline flag for tests that
-// run very quickly as a sanity check of the code:
+// As a convenience, there is a dedicated commandline flag for tests
+// that run very quickly as a sanity check of the code:
 //
 //  go test . --smoke
+//
+// The following helpers are used to tag tests:
+//
+//  RegisterPackageTagged - use in place of gc.TestingT
+//  SuiteTagged - use in place of gc.Suite
+//  RequireTag - use in tests, SetUpTest, or SetUpSuite
+//  SkipTag - use in tests, SetupTest, or SetUpSuite
+//
+// Note that test tagging is opt-in, so untagged tests will always run.
 
 // These are generally useful tags to use in tests.
 const (
-	TagBase       = "base"
 	TagSmall      = "small"
 	TagMedium     = "medium"
 	TagLarge      = "large"
+	TagBase       = "base"       // Runs by default.
 	TagSmoke      = "smoke"      // Fast sanity-check.
 	TagFunctional = "functional" // Does not use test doubles for low-level.
 	// TODO(ericsnow) Add other tags? For example:
