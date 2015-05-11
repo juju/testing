@@ -31,26 +31,22 @@ var defaultTags = []string{
 }
 
 var (
-	includedTags []string
-	excludedTags []string
+	parsedTags []string
 )
 
 func init() {
 	smoke := flag.Bool("smoke", false, "Run the basic set of fast tests.")
-	include := flag.String("include-tags", "", "Tagged tests to run.")
-	exclude := flag.String("exclude-tags", "", "Tagged tests to not run.")
+	raw := flag.String("tags", "", "Tagged tests to run.")
 	flag.Parse()
 
-	includedTags = parseTags(*include)
+	parsedTags = parseTags(*raw)
 	if *smoke {
-		includedTags = append(includedTags, TagSmoke)
+		parsedTags = append(parsedTags, TagSmoke)
 	}
-	if len(includedTags) == 0 {
-		includedTags = defaultTags
+	if len(parsedTags) == 0 {
+		parsedTags = defaultTags
 	}
 	// TODO(ericsnow) support implied tags (e.g. VM -> Large)?
-
-	excludedTags = parseTags(*exclude)
 }
 
 func parseTags(rawList ...string) []string {
@@ -74,19 +70,16 @@ func CheckTag(tags ...string) bool {
 }
 
 // MatchTag returns the first provided tag that matches the ones passed
-// in at the commandline.
+// in at the commandline, unless the match is an exclusion (starts with
+// "-").  In that case the check automatically fails. This is equivalent
+// to OR'ing the parsed tags.
 func MatchTag(tags ...string) string {
 	for _, tag := range tags {
-		for _, excludedTag := range excludedTags {
-			if tag == excludedTag {
+		for _, parsedTag := range parsedTags {
+			if parsedTag[0] == '-' && tag == parsedTag[1:] {
 				return ""
 			}
-		}
-	}
-
-	for _, tag := range tags {
-		for _, includedTag := range includedTags {
-			if tag == includedTag {
+			if tag == parsedTag {
 				return tag
 			}
 		}
