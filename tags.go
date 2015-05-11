@@ -32,22 +32,39 @@ var defaultTags = []string{
 
 var (
 	includedTags []string
+	excludedTags []string
 )
 
 func init() {
 	smoke := flag.Bool("smoke", false, "Run the basic set of fast tests.")
 	include := flag.String("include-tags", "", "Tagged tests to run.")
+	exclude := flag.String("exclude-tags", "", "Tagged tests to not run.")
 	flag.Parse()
 
-	includedTags = strings.Split(*include, ",")
+	includedTags = parseTags(*include)
 	if *smoke {
 		includedTags = append(includedTags, TagSmoke)
 	}
 	if len(includedTags) == 0 {
 		includedTags = defaultTags
 	}
-
 	// TODO(ericsnow) support implied tags (e.g. VM -> Large)?
+
+	excludedTags = parseTags(*exclude)
+}
+
+func parseTags(rawList ...string) []string {
+	var tags []string
+	for _, raw := range rawList {
+		for _, entry := range strings.Split(raw, ",") {
+			if len(entry) == 0 {
+				continue
+			}
+			tag := entry
+			tags = append(tags, tag)
+		}
+	}
+	return tags
 }
 
 // CheckTag determines whether or not any of the given tags were passed
@@ -59,6 +76,14 @@ func CheckTag(tags ...string) bool {
 // MatchTag returns the first provided tag that matches the ones passed
 // in at the commandline.
 func MatchTag(tags ...string) string {
+	for _, tag := range tags {
+		for _, excludedTag := range excludedTags {
+			if tag == excludedTag {
+				return ""
+			}
+		}
+	}
+
 	for _, tag := range tags {
 		for _, includedTag := range includedTags {
 			if tag == includedTag {
