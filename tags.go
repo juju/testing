@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/juju/cmd"
 	gc "gopkg.in/check.v1"
 )
 
@@ -23,6 +24,13 @@ import (
 // or medium or that are not tagged as functional. The first match wins,
 // so a medium test would match even if it is tagged as functional.
 //
+// Use multiple flags for logical-AND:
+//
+//  go test . --tags medium --tags -functional
+//
+// This would match all medium tests that are not also marked as
+// functional.
+//
 // As a convenience, there is a dedicated commandline flag for tests
 // that run very quickly as a sanity check of the code:
 //
@@ -33,7 +41,6 @@ import (
 //  RegisterPackageTagged - use in place of gc.TestingT
 //  SuiteTagged - use in place of gc.Suite
 //  RequireTag - use in tests, SetUpTest, or SetUpSuite
-//  SkipTag - use in tests, SetupTest, or SetUpSuite
 //
 // Note that test tagging is opt-in, so untagged tests will always run.
 
@@ -56,24 +63,35 @@ var defaultTags = []string{
 }
 
 var (
-	parsedTags []string
+	parsedTags [][]string
 )
 
 func init() {
-	smoke := flag.Bool("smoke", false, "Run the basic set of fast tests.")
-	raw := flag.String("tags", "", "Tagged tests to run.")
+	var raw []string
+	var smoke bool
+	flag.Var(cmd.NewAppendStringsValue(&raw), "tags", "Tagged tests to run.")
+	flag.BoolVar(&smoke, "smoke", false, "Run the basic set of fast tests.")
 	flag.Parse()
-
-	handleCommandline(*raw, *smoke)
+	handleCommandline(raw, smoke)
 }
 
-func handleCommandline(raw string, smoke bool) {
-	parsedTags = parseTags(raw)
-	if smoke {
-		parsedTags = append(parsedTags, TagSmoke)
+func handleCommandline(rawList []string, smoke bool) {
+	for _, raw := range rawList {
+		parsed := parseTags(raw)
+		if len(parsed) == 0 {
+			continue
+		}
+		if smoke {
+			parsed = append(parsed, TagSmoke)
+		}
+		parsedTags = append(parsedTags, parsed)
 	}
 	if len(parsedTags) == 0 {
-		parsedTags = defaultTags
+		if smoke {
+			parsedTags = append(parsedTags, []string{TagSmoke})
+		} else {
+			parsedTags = append(parsedTags, defaultTags)
+		}
 	}
 	// TODO(ericsnow) support implied tags (e.g. VM -> Large)?
 }
@@ -95,20 +113,28 @@ func parseTags(rawList ...string) []string {
 // CheckTag determines whether or not any of the given tags were passed
 // in at the commandline. Matches on "excluded" tags automatically fail.
 func CheckTag(tags ...string) bool {
-	return MatchTag(tags...) != ""
+	for _, parsed := range parsedTags {
+		if MatchTag(parsed, tags...) == "" {
+			return false
+		}
+	}
+	return true
 }
 
-// MatchTag returns the first provided tag that matches the ones passed
-// in at the commandline, unless the match is an exclusion (starts with
-// "-").  In that case the check automatically fails. This is equivalent
-// to OR'ing the parsed tags.
-func MatchTag(tags ...string) string {
+// MatchTag returns the first provided tag that matches a required tag,
+// unless the required tag is an exclusion (starts with "-"). In that
+// case the check automatically fails. This is equivalent to OR'ing the
+// parsed tags.
+func MatchTag(requiredTags []string, tags ...string) string {
 	for _, tag := range tags {
-		for _, parsedTag := range parsedTags {
-			if parsedTag[0] == '-' && tag == parsedTag[1:] {
+		for _, required := range requiredTags {
+			if required == "" {
+				continue
+			}
+			if required[0] == '-' && tag == required[1:] {
 				return ""
 			}
-			if tag == parsedTag {
+			if tag == required {
 				return tag
 			}
 		}
@@ -137,14 +163,5 @@ func SuiteTagged(suite interface{}, tags ...string) {
 func RequireTag(c *gc.C, tags ...string) {
 	if !CheckTag(tags...) {
 		c.Skip(fmt.Sprintf("skipping due to no matching tags (%v)", tags))
-	}
-}
-
-// SkipTag causes a test or suite to skip if any of the given tags were
-// passed in at the commandline.
-func SkipTag(c *gc.C, tags ...string) {
-	matched := MatchTag(tags...)
-	if matched != "" {
-		c.Skip(fmt.Sprintf("skipping due to %q tag", matched))
 	}
 }
