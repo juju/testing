@@ -1,5 +1,5 @@
 // Copyright 2015 Canonical Ltd.
-// Licensed under the AGPLv3, see LICENCE file for details.
+// Licensed under the LGPLv3, see LICENCE file for details.
 
 package testing
 
@@ -39,8 +39,12 @@ func init() {
 	raw := flag.String("tags", "", "Tagged tests to run.")
 	flag.Parse()
 
-	parsedTags = parseTags(*raw)
-	if *smoke {
+	handleCommandline(*raw, *smoke)
+}
+
+func handleCommandline(raw string, smoke bool) {
+	parsedTags = parseTags(raw)
+	if smoke {
 		parsedTags = append(parsedTags, TagSmoke)
 	}
 	if len(parsedTags) == 0 {
