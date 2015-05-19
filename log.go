@@ -49,9 +49,18 @@ func (s *LoggingSuite) SetUpTest(c *gc.C) {
 func (s *LoggingSuite) TearDownTest(c *gc.C) {
 }
 
+type discardWriter struct{}
+
+func (discardWriter) Write(level loggo.Level, name, filename string, line int, timestamp time.Time, message string) {
+}
+
 func (s *LoggingSuite) setUp(c *gc.C) {
 	loggo.ResetWriters()
-	loggo.ReplaceDefaultWriter(&gocheckWriter{c})
+	// Don't use the default writer for the test logging, which
+	// means we can still get logging output from tests that
+	// replace the default writer.
+	loggo.ReplaceDefaultWriter(discardWriter{})
+	loggo.RegisterWriter("loggingsuite", &gocheckWriter{c}, loggo.TRACE)
 	loggo.ResetLoggers()
 	err := loggo.ConfigureLoggers(logConfig)
 	c.Assert(err, gc.IsNil)
