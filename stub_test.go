@@ -68,7 +68,7 @@ func (s *stubSuite) TestNextErrPops(c *gc.C) {
 
 	s.stub.NextErr()
 
-	c.Check(s.stub.Errors(), jc.DeepEquals, []error{exp2})
+	s.stub.CheckErrors(c, exp2)
 }
 
 func (s *stubSuite) TestNextErrEmptyNil(c *gc.C) {
@@ -77,24 +77,6 @@ func (s *stubSuite) TestNextErrEmptyNil(c *gc.C) {
 
 	c.Check(err1, jc.ErrorIsNil)
 	c.Check(err2, jc.ErrorIsNil)
-}
-
-func (s *stubSuite) TestNextErrDefault(c *gc.C) {
-	expected := errors.New("<failure>")
-	s.stub.DefaultError = expected
-
-	err := s.stub.NextErr()
-
-	c.Check(err, gc.Equals, expected)
-}
-
-func (s *stubSuite) TestNextErrNil(c *gc.C) {
-	s.stub.DefaultError = errors.New("<failure>")
-	s.stub.SetErrors(nil)
-
-	err := s.stub.NextErr()
-
-	c.Check(err, jc.ErrorIsNil)
 }
 
 func (s *stubSuite) TestNextErrSkip(c *gc.C) {
@@ -135,7 +117,7 @@ func (s *stubSuite) TestAddCallRecorded(c *gc.C) {
 		FuncName: "aFunc",
 		Args:     []interface{}{1, 2, 3},
 	}})
-	c.Check(s.stub.Receivers(), jc.DeepEquals, []interface{}{nil})
+	s.stub.CheckReceivers(c, nil)
 }
 
 func (s *stubSuite) TestAddCallRepeated(c *gc.C) {
@@ -157,7 +139,7 @@ func (s *stubSuite) TestAddCallRepeated(c *gc.C) {
 		FuncName: "after",
 		Args:     []interface{}{"arg"},
 	}})
-	c.Check(s.stub.Receivers(), jc.DeepEquals, []interface{}{nil, nil, nil, nil})
+	s.stub.CheckReceivers(c, nil, nil, nil, nil)
 }
 
 func (s *stubSuite) TestAddCallNoArgs(c *gc.C) {
@@ -166,6 +148,14 @@ func (s *stubSuite) TestAddCallNoArgs(c *gc.C) {
 	c.Check(s.stub.Calls(), jc.DeepEquals, []testing.StubCall{{
 		FuncName: "aFunc",
 	}})
+}
+
+func (s *stubSuite) TestResetCalls(c *gc.C) {
+	s.stub.AddCall("aFunc")
+	s.stub.CheckCalls(c, []testing.StubCall{{FuncName: "aFunc"}})
+
+	s.stub.ResetCalls()
+	s.stub.CheckCalls(c, nil)
 }
 
 func (s *stubSuite) TestAddCallSequence(c *gc.C) {
@@ -189,7 +179,7 @@ func (s *stubSuite) TestMethodCallRecorded(c *gc.C) {
 		FuncName: "aMethod",
 		Args:     []interface{}{1, 2, 3},
 	}})
-	c.Check(s.stub.Receivers(), jc.DeepEquals, []interface{}{s.stub})
+	s.stub.CheckReceivers(c, s.stub)
 }
 
 func (s *stubSuite) TestMethodCallMixed(c *gc.C) {
@@ -197,7 +187,7 @@ func (s *stubSuite) TestMethodCallMixed(c *gc.C) {
 	s.stub.AddCall("aFunc", "arg")
 	s.stub.MethodCall(s.stub, "Method2")
 
-	s.stub.CheckCalls(c , []testing.StubCall{{
+	s.stub.CheckCalls(c, []testing.StubCall{{
 		FuncName: "Method1",
 		Args:     []interface{}{1, 2, 3},
 	}, {
@@ -206,7 +196,7 @@ func (s *stubSuite) TestMethodCallMixed(c *gc.C) {
 	}, {
 		FuncName: "Method2",
 	}})
-	c.Check(s.stub.Receivers(), jc.DeepEquals, []interface{}{s.stub, nil, s.stub})
+	s.stub.CheckReceivers(c, s.stub, nil, s.stub)
 }
 
 func (s *stubSuite) TestMethodCallEmbeddedMixed(c *gc.C) {
@@ -233,7 +223,7 @@ func (s *stubSuite) TestMethodCallEmbeddedMixed(c *gc.C) {
 	}, {
 		FuncName: "aMethod",
 	}})
-	c.Check(s.stub.Receivers(), jc.DeepEquals, []interface{}{stub1, nil, stub1, stub2})
+	s.stub.CheckReceivers(c, stub1, nil, stub1, stub2)
 }
 
 func (s *stubSuite) TestSetErrorsMultiple(c *gc.C) {
@@ -241,13 +231,13 @@ func (s *stubSuite) TestSetErrorsMultiple(c *gc.C) {
 	err2 := errors.New("<failure 2>")
 	s.stub.SetErrors(err1, err2)
 
-	c.Check(s.stub.Errors(), jc.DeepEquals, []error{err1, err2})
+	s.stub.CheckErrors(c, err1, err2)
 }
 
 func (s *stubSuite) TestSetErrorsEmpty(c *gc.C) {
-	s.stub.SetErrors()
+	s.stub.SetErrors() // pass an empty varargs of errors
 
-	c.Check(s.stub.Errors(), gc.HasLen, 0)
+	s.stub.CheckErrors(c) // check that it is indeed empty
 }
 
 func (s *stubSuite) TestSetErrorMixed(c *gc.C) {
@@ -255,14 +245,14 @@ func (s *stubSuite) TestSetErrorMixed(c *gc.C) {
 	err2 := errors.New("<failure 2>")
 	s.stub.SetErrors(nil, err1, nil, err2)
 
-	c.Check(s.stub.Errors(), jc.DeepEquals, []error{nil, err1, nil, err2})
+	s.stub.CheckErrors(c, nil, err1, nil, err2)
 }
 
 func (s *stubSuite) TestSetErrorsTrailingNil(c *gc.C) {
 	err := errors.New("<failure 1>")
 	s.stub.SetErrors(err, nil)
 
-	c.Check(s.stub.Errors(), jc.DeepEquals, []error{err, nil})
+	s.stub.CheckErrors(c, err, nil)
 }
 
 func (s *stubSuite) checkCallsStandard(c *gc.C) {
