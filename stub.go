@@ -4,6 +4,8 @@
 package testing
 
 import (
+	"sync"
+
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 )
@@ -49,15 +51,8 @@ type StubCall struct {
 // falling back to `DefaultError` when the sequence is exhausted. Thus
 // each stubbed method should call `NextErr` to get its error return value.
 //
-// To validate calls made to the stub in a test, check Stub.Calls or
-// call the CheckCalls (or CheckCall) method:
-//
-//    c.Check(s.stub.Calls, jc.DeepEquals, []StubCall{{
-//        FuncName: "Send",
-//        Args: []interface{}{
-//            expected,
-//        },
-//    }})
+// To validate calls made to the stub in a test call the CheckCalls
+// (or CheckCall) method:
 //
 //    s.stub.CheckCalls(c, []StubCall{{
 //        FuncName: "Send",
@@ -87,29 +82,32 @@ type StubCall struct {
 // func, as well as controlling the return value from the func in a
 // clean manner (by simply setting the correct field on the stub).
 type Stub struct {
-	// Calls is the list of calls that have been registered on the stub
+
+	// DefaultError is the default error (when Errors is empty). The
+	// typical Stub usage will leave this nil (i.e. no error).
+	DefaultError error
+
+	mu sync.Mutex	// serialises access the to following fields
+	
+	// calls is the list of calls that have been registered on the stub
 	// (i.e. made on the stub's methods), in the order that they were
 	// made.
-	Calls []StubCall
+	calls []StubCall
 
-	// Receivers is the list of receivers for all the recorded calls.
+	// receivers is the list of receivers for all the recorded calls.
 	// In the case of non-methods, the receiver is set to nil. The
 	// receivers are tracked here rather than as a Receiver field on
 	// StubCall because StubCall represents the common case for
 	// testing. Typically the receiver does not need to be checked.
-	Receivers []interface{}
+	receivers []interface{}
 
-	// Errors holds the list of error return values to use for
+	// errors holds the list of error return values to use for
 	// successive calls to methods that return an error. Each call
 	// pops the next error off the list. An empty list (the default)
 	// implies a nil error. nil may be precede actual errors in the
 	// list, which means that the first calls will succeed, followed
 	// by the failure. All this is facilitated through the Err method.
-	Errors []error
-
-	// DefaultError is the default error (when Errors is empty). The
-	// typical Stub usage will leave this nil (i.e. no error).
-	DefaultError error
+	errors []error
 }
 
 // TODO(ericsnow) Add something similar to NextErr for all return values
@@ -119,20 +117,58 @@ type Stub struct {
 // any method on the stub. It should be called for the error return in
 // all stubbed methods.
 func (f *Stub) NextErr() error {
-	if len(f.Errors) == 0 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.errors) == 0 {
 		return f.DefaultError
 	}
-	err := f.Errors[0]
-	f.Errors = f.Errors[1:]
+	err := f.errors[0]
+	f.errors = f.errors[1:]
 	return err
 }
 
+
+// Errors returns the list of error return values to use for
+// successive calls to methods that return an error. Each call
+// pops the next error off the list. An empty list (the default)
+// implies a nil error. nil may be precede actual errors in the
+// list, which means that the first calls will succeed, followed
+// by the failure. All this is facilitated through the Err method.
+func (f *Stub) Errors() []error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.errors	
+}
+
+// Receivers returns a list of receivers for all the recorded calls.
+// In the case of non-methods, the receiver is set to nil. The
+// receivers are tracked here rather than as a Receiver field on
+// StubCall because StubCall represents the common case for
+// testing. Typically the receiver does not need to be checked.
+func (f *Stub) Receivers() []interface{} {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.receivers	
+}
+
 func (f *Stub) addCall(rcvr interface{}, funcName string, args []interface{}) {
-	f.Calls = append(f.Calls, StubCall{
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, StubCall{
 		FuncName: funcName,
 		Args:     args,
 	})
-	f.Receivers = append(f.Receivers, rcvr)
+	f.receivers = append(f.receivers, rcvr)
+}
+
+// Calls returns the list of calls that have been registered on the stub
+// (i.e. made on the stub's methods), in the order that they were made.
+func (f *Stub) Calls() []StubCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	v := make([]StubCall, len(f.calls))
+	copy(v, f.calls)
+	return v
 }
 
 // AddCall records a stubbed function call for later inspection using the
@@ -153,7 +189,9 @@ func (f *Stub) MethodCall(receiver interface{}, funcName string, args ...interfa
 // frontloading nil here will allow calls to pass, followed by a
 // failure.
 func (f *Stub) SetErrors(errors ...error) {
-	f.Errors = errors
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.errors = errors
 }
 
 // CheckCalls verifies that the history of calls on the stub's methods
@@ -163,7 +201,7 @@ func (f *Stub) CheckCalls(c *gc.C, expected []StubCall) {
 	if !f.CheckCallNames(c, stubCallNames(expected...)...) {
 		return
 	}
-	c.Check(f.Calls, jc.DeepEquals, expected)
+	c.Check(f.calls, jc.DeepEquals, expected)
 }
 
 // CheckCall checks the recorded call at the given index against the
@@ -173,10 +211,12 @@ func (f *Stub) CheckCalls(c *gc.C, expected []StubCall) {
 //
 //     c.Check(mystub.Receivers[index], gc.Equals, expected)
 func (f *Stub) CheckCall(c *gc.C, index int, funcName string, args ...interface{}) {
-	if !c.Check(index, jc.LessThan, len(f.Calls)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !c.Check(index, jc.LessThan, len(f.calls)) {
 		return
 	}
-	call := f.Calls[index]
+	call := f.calls[index]
 	expected := StubCall{
 		FuncName: funcName,
 		Args:     args,
@@ -187,7 +227,9 @@ func (f *Stub) CheckCall(c *gc.C, index int, funcName string, args ...interface{
 // CheckCallNames verifies that the in-order list of called method names
 // matches the expected calls.
 func (f *Stub) CheckCallNames(c *gc.C, expected ...string) bool {
-	funcNames := stubCallNames(f.Calls...)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	funcNames := stubCallNames(f.calls...)
 	return c.Check(funcNames, jc.DeepEquals, expected)
 }
 
