@@ -4,8 +4,8 @@
 package testing
 
 // Suite registers the provided suite with the test runner, but only
-// if the base test tags was passed at the commandline, which it is
-// by default. Use Suite in place of gc.Suite.
+// if the "default" test tags were passed at the commandline, which they
+// are by default. Use Suite in place of gc.Suite.
 func Suite(suite interface{}) {
-	SuiteTagged(suite, TagBase)
+	SuiteTagged(suite, defaultTags...)
 }

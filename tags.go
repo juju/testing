@@ -46,20 +46,24 @@ import (
 
 // These are generally useful tags to use in tests.
 const (
-	TagSmall      = "small"
-	TagMedium     = "medium"
-	TagLarge      = "large"
-	TagBase       = "base"       // Runs by default.
-	TagSmoke      = "smoke"      // Fast sanity-check.
+	TagSmall      = "small"      // Runs quickly (smoke tests).
+	TagLarge      = "large"      // Does not run quickly.
 	TagFunctional = "functional" // Does not use test doubles for low-level.
 	// TODO(ericsnow) Add other tags? For example:
+	//  - default: test runs when no other tags are specified
 	//  - external: test uses external resources (e.g. filesystem)
 	//  - cloud: test interacts with a cloud provider's API
 	//  - vm: test runs in a local VM (e.g. kvm) for isolation
 )
 
 var defaultTags = []string{
-	TagBase,
+	TagSmall,
+	TagLarge,
+	TagFunctional,
+}
+
+var smokeTags = []string{
+	TagSmall,
 }
 
 var (
@@ -82,13 +86,13 @@ func handleCommandline(rawList []string, smoke bool) {
 			continue
 		}
 		if smoke {
-			parsed = append(parsed, TagSmoke)
+			parsed = append(parsed, smokeTags...)
 		}
 		parsedTags = append(parsedTags, parsed)
 	}
 	if len(parsedTags) == 0 {
 		if smoke {
-			parsedTags = append(parsedTags, []string{TagSmoke})
+			parsedTags = append(parsedTags, smokeTags)
 		} else {
 			parsedTags = append(parsedTags, defaultTags)
 		}

@@ -67,7 +67,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineSmokeOnly(c *gc.C) {
 	tags := s.parsedTags()
 
 	c.Check(tags, jc.DeepEquals, [][]string{
-		{testing.TagSmoke},
+		{testing.TagSmall},
 	})
 }
 
@@ -79,7 +79,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineSmokeAdded(c *gc.C) {
 	tags := s.parsedTags()
 
 	c.Check(tags, jc.DeepEquals, [][]string{
-		{"spam", testing.TagSmoke},
+		{"spam", testing.TagSmall},
 	})
 }
 
@@ -88,7 +88,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineDefault(c *gc.C) {
 	tags := s.parsedTags()
 
 	c.Check(tags, jc.DeepEquals, [][]string{
-		{testing.TagBase},
+		{testing.TagSmall, testing.TagLarge, testing.TagFunctional},
 	})
 }
 
