@@ -17,19 +17,18 @@ var _ = gc.Suite(&tagMatchingSuite{})
 type tagsCommandlineSuite struct{}
 
 func (s *tagsCommandlineSuite) SetUpTest(c *gc.C) {
-	*testing.ParsedTags = nil
+	testing.SetTags()
 }
 
 func (tagsCommandlineSuite) parsedTags() [][]string {
-	return *testing.ParsedTags
+	return testing.GetTags()
 }
 
 func (s tagsCommandlineSuite) TestHandleCommandlineMultipleTagsAlone(c *gc.C) {
 	raw := []string{
 		"spam,ham,eggs",
 	}
-	testing.HandleCommandline(raw, false)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(raw, false)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{"spam", "ham", "eggs"},
@@ -41,8 +40,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineMultipleTagsUnion(c *gc.C) {
 		"spam,ham,eggs",
 		"foo,bar",
 	}
-	testing.HandleCommandline(raw, false)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(raw, false)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{"spam", "ham", "eggs"},
@@ -54,8 +52,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineSingleTag(c *gc.C) {
 	raw := []string{
 		"spam",
 	}
-	testing.HandleCommandline(raw, false)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(raw, false)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{"spam"},
@@ -63,8 +60,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineSingleTag(c *gc.C) {
 }
 
 func (s tagsCommandlineSuite) TestHandleCommandlineSmokeOnly(c *gc.C) {
-	testing.HandleCommandline(nil, true)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(nil, true)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{testing.TagSmall},
@@ -75,8 +71,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineSmokeAdded(c *gc.C) {
 	raw := []string{
 		"spam",
 	}
-	testing.HandleCommandline(raw, true)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(raw, true)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{"spam", testing.TagSmall},
@@ -84,8 +79,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineSmokeAdded(c *gc.C) {
 }
 
 func (s tagsCommandlineSuite) TestHandleCommandlineDefault(c *gc.C) {
-	testing.HandleCommandline(nil, false)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(nil, false)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{testing.TagSmall, testing.TagLarge, testing.TagFunctional},
@@ -96,8 +90,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineExcludedOnly(c *gc.C) {
 	raw := []string{
 		"-spam",
 	}
-	testing.HandleCommandline(raw, false)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(raw, false)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{"-spam"},
@@ -108,8 +101,7 @@ func (s tagsCommandlineSuite) TestHandleCommandlineExcludedMixed(c *gc.C) {
 	raw := []string{
 		"spam,-eggs",
 	}
-	testing.HandleCommandline(raw, false)
-	tags := s.parsedTags()
+	tags := testing.HandleCommandline(raw, false)
 
 	c.Check(tags, jc.DeepEquals, [][]string{
 		{"spam", "-eggs"},
@@ -164,7 +156,7 @@ func (s *tagMatchingSuite) SetUpTest(c *gc.C) {
 }
 
 func (tagMatchingSuite) setParsed(tags ...string) {
-	*testing.ParsedTags = [][]string{tags}
+	testing.SetTags(tags)
 }
 
 func (tagMatchingSuite) setParsedUnion(tagsList ...string) {
@@ -172,7 +164,7 @@ func (tagMatchingSuite) setParsedUnion(tagsList ...string) {
 	for _, tags := range tagsList {
 		parsedTags = append(parsedTags, testing.ParseTags(tags))
 	}
-	*testing.ParsedTags = parsedTags
+	testing.SetTags(parsedTags...)
 }
 
 func (s tagMatchingSuite) TestCheckTagTryMultiple(c *gc.C) {

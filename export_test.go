@@ -5,6 +5,13 @@ package testing
 
 var (
 	HandleCommandline = handleCommandline
-	ParsedTags        = &parsedTags
 	ParseTags         = parseTags
 )
+
+func GetTags() [][]string {
+	return rawTags.parse()
+}
+
+func SetTags(tags ...[]string) {
+	rawTags.parsed = tags
+}

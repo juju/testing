@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juju/cmd"
 	gc "gopkg.in/check.v1"
 )
 
@@ -67,19 +66,40 @@ var smokeTags = []string{
 }
 
 var (
-	parsedTags [][]string
+	rawTags tagsValue
 )
 
 func init() {
-	var raw []string
-	var smoke bool
-	flag.Var(cmd.NewAppendStringsValue(&raw), "tags", "Tagged tests to run.")
-	flag.BoolVar(&smoke, "smoke", false, "Run the basic set of fast tests.")
-	flag.Parse()
-	handleCommandline(raw, smoke)
+	flag.Var(&rawTags, "tags", "Tagged tests to run.")
+	flag.BoolVar(&rawTags.smoke, "smoke", false, "Run the basic set of fast tests.")
 }
 
-func handleCommandline(rawList []string, smoke bool) {
+type tagsValue struct {
+	raw    []string
+	smoke  bool
+	parsed [][]string
+}
+
+// Set implements flag.Value.
+func (v *tagsValue) Set(s string) error {
+	v.raw = append(v.raw, s)
+	return nil
+}
+
+// String implements flag.Value.
+func (v *tagsValue) String() string {
+	return strings.Join(v.raw, ",")
+}
+
+func (v *tagsValue) parse() [][]string {
+	if v.parsed == nil {
+		v.parsed = handleCommandline(v.raw, v.smoke)
+	}
+	return v.parsed
+}
+
+func handleCommandline(rawList []string, smoke bool) [][]string {
+	var parsedTags [][]string
 	for _, raw := range rawList {
 		parsed := parseTags(raw)
 		if len(parsed) == 0 {
@@ -98,6 +118,7 @@ func handleCommandline(rawList []string, smoke bool) {
 		}
 	}
 	// TODO(ericsnow) support implied tags (e.g. VM -> Large)?
+	return parsedTags
 }
 
 func parseTags(rawList ...string) []string {
@@ -117,7 +138,7 @@ func parseTags(rawList ...string) []string {
 // CheckTag determines whether or not any of the given tags were passed
 // in at the commandline. Matches on "excluded" tags automatically fail.
 func CheckTag(tags ...string) bool {
-	for _, parsed := range parsedTags {
+	for _, parsed := range rawTags.parse() {
 		if MatchTag(parsed, tags...) == "" {
 			return false
 		}
