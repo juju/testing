@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/juju/utils"
 	gc "github.com/juju/check"
+	"github.com/juju/utils"
 )
 
 type TestFile struct {

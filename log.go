@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/juju/loggo"
 	gc "github.com/juju/check"
+	"github.com/juju/loggo"
 )
 
 // LoggingSuite redirects the juju logger to the test logger

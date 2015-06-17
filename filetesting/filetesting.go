@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	jc "github.com/juju/testing/checkers"
 	gc "github.com/juju/check"
+	jc "github.com/juju/testing/checkers"
 )
 
 // Entry represents a filesystem entity that can be created; and whose

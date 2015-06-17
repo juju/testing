@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	jc "github.com/juju/testing/checkers"
 	gc "github.com/juju/check"
+	jc "github.com/juju/testing/checkers"
 )
 
 type isNotExistSuite struct{}

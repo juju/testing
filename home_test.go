@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/juju/utils"
 	gc "github.com/juju/check"
+	"github.com/juju/utils"
 
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"

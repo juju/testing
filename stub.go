@@ -6,8 +6,8 @@ package testing
 import (
 	"sync"
 
-	jc "github.com/juju/testing/checkers"
 	gc "github.com/juju/check"
+	jc "github.com/juju/testing/checkers"
 )
 
 // StubCall records the name of a called function and the passed args.
