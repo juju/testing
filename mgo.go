@@ -26,7 +26,7 @@ import (
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 	"gopkg.in/mgo.v2"
 )
 

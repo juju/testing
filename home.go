@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/juju/utils"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 type TestFile struct {

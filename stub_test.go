@@ -5,7 +5,7 @@ package testing_test
 
 import (
 	"github.com/juju/errors"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"

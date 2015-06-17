@@ -9,7 +9,7 @@ import (
 	"runtime"
 
 	"github.com/juju/utils"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"

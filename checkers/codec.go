@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 	"gopkg.in/yaml.v1"
 )
 

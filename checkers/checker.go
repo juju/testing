@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 func TimeBetween(start, end time.Time) gc.Checker {

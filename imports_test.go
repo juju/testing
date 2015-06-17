@@ -11,7 +11,7 @@ import (
 
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 type importsSuite struct {

@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 // OsEnvSuite isolates the tests from the underlaying system environment.

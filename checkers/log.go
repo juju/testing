@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/juju/loggo"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 type SimpleMessage struct {

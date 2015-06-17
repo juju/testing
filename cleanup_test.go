@@ -6,7 +6,7 @@ package testing_test
 import (
 	"os"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 
 	"github.com/juju/testing"
 )

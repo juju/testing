@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 // LoggingSuite redirects the juju logger to the test logger

@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 
 	jc "github.com/juju/testing/checkers"
 )

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 type isNotExistSuite struct{}

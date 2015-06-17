@@ -4,7 +4,7 @@
 package testing
 
 import (
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 // IsolationSuite isolates the tests from the underlaying system environment,
