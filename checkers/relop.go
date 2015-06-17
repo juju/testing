@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 // GreaterThan checker

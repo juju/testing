@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 // OsEnvSuite isolates the tests from the underlaying system environment.
@@ -67,25 +67,25 @@ var testingVariables = []string{
 }
 
 func (s *OsEnvSuite) setEnviron() {
-	var isWhitelisted func (string) bool
+	var isWhitelisted func(string) bool
 	switch runtime.GOOS {
 	case "windows":
 		// Lowercase variable names for comparison as they are case
 		// insenstive on windows. Fancy folding not required for ascii.
 		lowerEnv := make(map[string]struct{},
-			len(windowsVariables) + len(testingVariables))
+			len(windowsVariables)+len(testingVariables))
 		for _, envVar := range windowsVariables {
 			lowerEnv[strings.ToLower(envVar)] = struct{}{}
 		}
 		for _, envVar := range testingVariables {
 			lowerEnv[strings.ToLower(envVar)] = struct{}{}
 		}
-		isWhitelisted = func (envVar string) bool {
+		isWhitelisted = func(envVar string) bool {
 			_, ok := lowerEnv[strings.ToLower(envVar)]
 			return ok
 		}
 	default:
-		isWhitelisted = func (envVar string) bool {
+		isWhitelisted = func(envVar string) bool {
 			for _, testingVar := range testingVariables {
 				if testingVar == envVar {
 					return true

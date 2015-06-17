@@ -4,8 +4,8 @@
 package testing_test
 
 import (
+	gc "github.com/juju/check"
 	"github.com/juju/errors"
-	gc "gopkg.in/check.v1"
 
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"

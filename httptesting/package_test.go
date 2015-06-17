@@ -6,7 +6,7 @@ package httptesting_test
 import (
 	"testing"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 func Test(t *testing.T) {

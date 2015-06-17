@@ -16,4 +16,3 @@ import "os"
 func (inst *MgoInstance) DestroyWithLog() {
 	inst.killAndCleanup(os.Kill)
 }
-

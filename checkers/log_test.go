@@ -4,8 +4,8 @@
 package checkers_test
 
 import (
+	gc "github.com/juju/check"
 	"github.com/juju/loggo"
-	gc "gopkg.in/check.v1"
 
 	jc "github.com/juju/testing/checkers"
 )

@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
+	gc "github.com/juju/check"
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 )
 

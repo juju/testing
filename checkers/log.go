@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	gc "github.com/juju/check"
 	"github.com/juju/loggo"
-	gc "gopkg.in/check.v1"
 )
 
 type SimpleMessage struct {

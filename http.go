@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	gc "gopkg.in/check.v1"
+	gc "github.com/juju/check"
 )
 
 type HTTPSuite struct{}

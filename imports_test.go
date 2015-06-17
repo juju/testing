@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"text/template"
 
+	gc "github.com/juju/check"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 )
 
 type importsSuite struct {
