@@ -295,7 +295,8 @@ func (inst *MgoInstance) run() error {
 }
 
 func getMongod() (string, error) {
-	paths := []string{"mongod", "/usr/lib/juju/bin/mongod"}
+	// The last path is needed in tests on CentOS where PATH is being completely removed
+	paths := []string{"mongod", "/usr/lib/juju/bin/mongod", "/usr/local/bin/mongod"}
 	if path := os.Getenv("JUJU_MONGOD"); path != "" {
 		paths = append([]string{path}, paths...)
 	}

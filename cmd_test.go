@@ -5,7 +5,7 @@ package testing_test
 
 import (
 	"os/exec"
-	"runtime"
+	"strings"
 
 	gc "gopkg.in/check.v1"
 
@@ -39,18 +39,14 @@ func (s *cmdSuite) EnsureArgFileRemoved(name string) {
 	})
 }
 
-const testFunc = "test-ouput"
+const testFunc = "test-output"
 
 func (s *cmdSuite) TestPatchExecutableNoArgs(c *gc.C) {
 	s.EnsureArgFileRemoved(testFunc)
 	testing.PatchExecutableAsEchoArgs(c, s, testFunc)
 	output := runCommand(c, testFunc)
-	switch runtime.GOOS {
-	case "windows":
-		c.Assert(output, gc.Equals, testFunc+"\r\n")
-	default:
-		c.Assert(output, gc.Equals, testFunc+"\n")
-	}
+	output = strings.TrimRight(output, "\r\n")
+	c.Assert(output, gc.Equals, testFunc)
 	testing.AssertEchoArgs(c, testFunc)
 }
 
@@ -58,12 +54,10 @@ func (s *cmdSuite) TestPatchExecutableWithArgs(c *gc.C) {
 	s.EnsureArgFileRemoved(testFunc)
 	testing.PatchExecutableAsEchoArgs(c, s, testFunc)
 	output := runCommand(c, testFunc, "foo", "bar baz")
-	switch runtime.GOOS {
-	case "windows":
-		c.Assert(output, gc.Equals, testFunc+" \"foo\" \"bar baz\"\r\n")
-	default:
-		c.Assert(output, gc.Equals, testFunc+" \"foo\" \"bar baz\"\n")
-	}
+	output = strings.TrimRight(output, "\r\n")
+
+	c.Assert(output, gc.DeepEquals, testFunc+" 'foo' 'bar baz'")
+
 	testing.AssertEchoArgs(c, testFunc, "foo", "bar baz")
 }
 
@@ -72,12 +66,8 @@ func (s *cmdSuite) TestPatchExecutableThrowError(c *gc.C) {
 	cmd := exec.Command(testFunc)
 	out, err := cmd.CombinedOutput()
 	c.Assert(err, gc.ErrorMatches, "exit status 1")
-	switch runtime.GOOS {
-	case "windows":
-		c.Assert(string(out), gc.Equals, "failing\r\n")
-	default:
-		c.Assert(string(out), gc.Equals, "failing\n")
-	}
+	output := strings.TrimRight(string(out), "\r\n")
+	c.Assert(output, gc.Equals, "failing")
 }
 
 func runCommand(c *gc.C, command string, args ...string) string {

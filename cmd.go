@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juju/utils"
+
 	gc "gopkg.in/check.v1"
 )
 
@@ -50,7 +52,7 @@ argfile="$name.out"
 exitcodesfile="$name.exitcodes"
 printf "%s" $name | tee -a $argfile
 for arg in "$@"; do
-  printf " \"%s\""  "$arg" | tee -a $argfile
+  printf " '%s'" "$arg" | tee -a $argfile
 done
 printf "\n" | tee -a $argfile
 if [ -f $exitcodesfile ]
@@ -183,11 +185,12 @@ func AssertEchoArgs(c *gc.C, execName string, args ...string) {
 	// Create expected output string
 	expected := execName
 	for _, arg := range args {
-		expected = fmt.Sprintf("%s %q", expected, arg)
+		expected = fmt.Sprintf("%s %s", expected, utils.ShQuote(arg))
 	}
 
 	// Check that the expected and the first line of actual output are the same
 	actual := strings.TrimSuffix(lines[0], "\r")
+
 	c.Assert(actual, gc.Equals, expected)
 
 	// Write out the remaining lines for the next check
