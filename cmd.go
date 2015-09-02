@@ -72,7 +72,7 @@ for %%x in (%*) do (
    set /A argCount+=1
    set "argVec[!argCount!]=%%~x"
 )
-for /L %%i in (1,1,%argCount%) do set list=!list! "!argVec[%%i]!"
+for /L %%i in (1,1,%argCount%) do set list=!list! '!argVec[%%i]!'
 
 IF exist %0.exitcodes (
     FOR /F "tokens=1* delims=;" %%i IN (%0.exitcodes) DO (
