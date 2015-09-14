@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"strings"
 
 	gc "gopkg.in/check.v1"
@@ -81,6 +82,10 @@ type JSONCallParams struct {
 	// result.
 	ExpectBody interface{}
 
+	// ExpectHeader holds any HTTP headers that must be present in the response.
+	// Note that the response may also contain headers not in this field.
+	ExpectHeader http.Header
+
 	// Cookies, if specified, are added to the request.
 	Cookies []*http.Cookie
 }
@@ -110,6 +115,10 @@ func AssertJSONCall(c *gc.C, p JSONCallParams) {
 		return
 	}
 	AssertJSONResponse(c, rec, p.ExpectStatus, p.ExpectBody)
+
+	for k, v := range p.ExpectHeader {
+		c.Assert(rec.HeaderMap[textproto.CanonicalMIMEHeaderKey(k)], gc.DeepEquals, v, gc.Commentf("header %q", k))
+	}
 }
 
 // AssertJSONResponse asserts that the given response recorder has
@@ -125,6 +134,7 @@ func AssertJSONResponse(c *gc.C, rec *httptest.ResponseRecorder, expectStatus in
 		return
 	}
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "application/json")
+
 	if assertBody, ok := expectBody.(BodyAsserter); ok {
 		var data json.RawMessage
 		err := json.Unmarshal(rec.Body.Bytes(), &data)

@@ -104,6 +104,38 @@ var assertJSONCallTests = []struct {
 		ExpectStatus: http.StatusOK,
 	},
 }, {
+	about: "test for ExceptHeader in response",
+	params: httptesting.JSONCallParams{
+		URL: "/",
+		Do: func(req *http.Request) (*http.Response, error) {
+			resp, err := http.DefaultClient.Do(req)
+			resp.StatusCode = http.StatusOK
+			resp.Header["Custom"] = []string{"value1", "value2"}
+			resp.Header["Ignored"] = []string{"value3", "value3"}
+			return resp, err
+		},
+		ExpectStatus: http.StatusOK,
+		ExpectHeader: http.Header{
+			"Custom": {"value1", "value2"},
+		},
+	},
+}, {
+	about: "test case insensitive for ExceptHeader in response",
+	params: httptesting.JSONCallParams{
+		URL: "/",
+		Do: func(req *http.Request) (*http.Response, error) {
+			resp, err := http.DefaultClient.Do(req)
+			resp.StatusCode = http.StatusOK
+			resp.Header["Custom"] = []string{"value1", "value2"}
+			resp.Header["Ignored"] = []string{"value3", "value3"}
+			return resp, err
+		},
+		ExpectStatus: http.StatusOK,
+		ExpectHeader: http.Header{
+			"CUSTOM": {"value1", "value2"},
+		},
+	},
+}, {
 	about: "error status",
 	params: httptesting.JSONCallParams{
 		URL:          "/",
