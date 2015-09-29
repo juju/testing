@@ -208,9 +208,29 @@ type DoRequestParams struct {
 	Cookies []*http.Cookie
 }
 
-// DoRequest invokes a request on the given handler with the given
-// parameters.
+// DoRequest is the same as Do except that it returns
+// an httptest.ResponseRecorder instead of an http.Response.
+// This function exists for backward compatibility reasons.
 func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
+	resp := Do(c, p)
+	if p.ExpectError != "" {
+		return nil
+	}
+	defer resp.Body.Close()
+	var rec httptest.ResponseRecorder
+	rec.HeaderMap = resp.Header
+	rec.Code = resp.StatusCode
+	rec.Body = new(bytes.Buffer)
+	_, err := io.Copy(rec.Body, resp.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	return &rec
+}
+
+// Do invokes a request on the given handler with the given
+// parameters and returns the resulting HTTP response.
+// Note that, as with http.Client.Do, the response body
+// must be closed.
+func Do(c *gc.C, p DoRequestParams) *http.Response {
 	if p.Method == "" {
 		p.Method = "GET"
 	}
@@ -254,17 +274,7 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 		return nil
 	}
 	c.Assert(err, jc.ErrorIsNil)
-	defer resp.Body.Close()
-
-	// TODO(rog) don't return a ResponseRecorder because we're not actually
-	// using httptest.NewRecorder ?
-	var rec httptest.ResponseRecorder
-	rec.HeaderMap = resp.Header
-	rec.Code = resp.StatusCode
-	rec.Body = new(bytes.Buffer)
-	_, err = io.Copy(rec.Body, resp.Body)
-	c.Assert(err, jc.ErrorIsNil)
-	return &rec
+	return resp
 }
 
 // bodyContentLength returns the Content-Length
