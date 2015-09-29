@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	gc "gopkg.in/check.v1"
@@ -272,6 +273,18 @@ func (*requestsSuite) TestAssertJSONCallWithBodyAsserter(c *gc.C) {
 	}
 	httptesting.AssertJSONCall(c, params)
 	c.Assert(called, gc.Equals, true)
+}
+
+func (*requestsSuite) TestAssertJSONCallWithHostedURL(c *gc.C) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(fmt.Sprintf("%q", "ok "+req.URL.Path)))
+	}))
+	defer srv.Close()
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		URL:        srv.URL + "/foo",
+		ExpectBody: "ok /foo",
+	})
 }
 
 var bodyReaderFuncs = []func(string) io.Reader{
