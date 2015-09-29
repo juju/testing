@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
 	"strings"
 
 	gc "gopkg.in/check.v1"
@@ -37,15 +38,19 @@ type JSONCallParams struct {
 	// nil.
 	ExpectError string
 
-	// Handler holds the handler to use to make the request.
-	Handler http.Handler
-
 	// Method holds the HTTP method to use for the call.
 	// GET is assumed if this is empty.
 	Method string
 
 	// URL holds the URL to pass when making the request.
+	// If the URL does not contain a host, a temporary
+	// HTTP server is started running the Handler below
+	// which is used for the host.
 	URL string
+
+	// Handler holds the handler to use to make the request.
+	// It is ignored if the above URL field has a host part.
+	Handler http.Handler
 
 	// JSONBody specifies a JSON value to marshal to use
 	// as the body of the request. If this is specified, Body will
@@ -160,15 +165,19 @@ type DoRequestParams struct {
 	// nil.
 	ExpectError string
 
-	// Handler holds the handler to use to make the request.
-	Handler http.Handler
-
 	// Method holds the HTTP method to use for the call.
 	// GET is assumed if this is empty.
 	Method string
 
 	// URL holds the URL to pass when making the request.
+	// If the URL does not contain a host, a temporary
+	// HTTP server is started running the Handler below
+	// which is used for the host.
 	URL string
+
+	// Handler holds the handler to use to make the request.
+	// It is ignored if the above URL field has a host part.
+	Handler http.Handler
 
 	// JSONBody specifies a JSON value to marshal to use
 	// as the body of the request. If this is specified, Body will
@@ -208,9 +217,11 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	if p.Do == nil {
 		p.Do = http.DefaultClient.Do
 	}
-	srv := httptest.NewServer(p.Handler)
-	defer srv.Close()
-
+	if reqURL, err := url.Parse(p.URL); err == nil && reqURL.Host == "" {
+		srv := httptest.NewServer(p.Handler)
+		defer srv.Close()
+		p.URL = srv.URL + p.URL
+	}
 	if p.JSONBody != nil {
 		data, err := json.Marshal(p.JSONBody)
 		c.Assert(err, jc.ErrorIsNil)
@@ -218,7 +229,7 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 	}
 	// Note: we avoid NewRequest's odious reader wrapping by using
 	// a custom nopCloser function.
-	req, err := http.NewRequest(p.Method, srv.URL+p.URL, nopCloser(p.Body))
+	req, err := http.NewRequest(p.Method, p.URL, nopCloser(p.Body))
 	c.Assert(err, jc.ErrorIsNil)
 	if p.JSONBody != nil {
 		req.Header.Set("Content-Type", "application/json")
