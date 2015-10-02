@@ -319,3 +319,41 @@ func (*requestsSuite) TestDoRequestWithInferrableContentLength(c *gc.C) {
 // calls. Failures are already massively tested in practice. DoRequest and
 // AssertJSONResponse are also indirectly tested as they are called by
 // AssertJSONCall.
+
+type urlRewritingTransportSuite struct {
+	server *httptest.Server
+}
+
+var _ = gc.Suite(&urlRewritingTransportSuite{})
+
+func (s *urlRewritingTransportSuite) SetUpTest(c *gc.C) {
+	s.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(r.URL.String()))
+	}))
+}
+
+func (s *urlRewritingTransportSuite) TestTransport(c *gc.C) {
+	t := httptesting.URLRewritingTransport{
+		MatchPrefix: "http://example.com",
+		Replace:     s.server.URL,
+	}
+	client := http.Client{
+		Transport: &t,
+	}
+	resp, err := client.Get("http://example.com/path")
+	c.Assert(err, jc.ErrorIsNil)
+	body, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	resp.Body.Close()
+	c.Assert(resp.Request.URL.String(), gc.Equals, "http://example.com/path")
+	c.Assert(string(body), gc.Equals, "/path")
+
+	t.RoundTripper = &http.Transport{}
+	resp, err = client.Get(s.server.URL + "/otherpath")
+	c.Assert(err, jc.ErrorIsNil)
+	body, err = ioutil.ReadAll(resp.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	resp.Body.Close()
+	c.Assert(resp.Request.URL.String(), gc.Equals, s.server.URL+"/otherpath")
+	c.Assert(string(body), gc.Equals, "/otherpath")
+}

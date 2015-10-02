@@ -321,3 +321,40 @@ type readSeekNopCloser struct {
 func (readSeekNopCloser) Close() error {
 	return nil
 }
+
+// URLRewritingTransport is an http.RoundTripper that can rewrite request
+// URLs. If the request URL has the prefix specified in Match that part
+// will be changed to the value specified in Replace. RoundTripper will
+// then be used to perform the resulting request. If RoundTripper is nil
+// http.DefaultTransport will be used.
+//
+// This can be used in tests that, for whatever reason, need to make a
+// call to a URL that's not in our control but we want to control the
+// results of HTTP requests to that URL.
+type URLRewritingTransport struct {
+	MatchPrefix  string
+	Replace      string
+	RoundTripper http.RoundTripper
+}
+
+// RoundTrip implements http.RoundTripper.
+func (t URLRewritingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt := t.RoundTripper
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	if !strings.HasPrefix(req.URL.String(), t.MatchPrefix) {
+		return rt.RoundTrip(req)
+	}
+	req1 := *req
+	var err error
+	req1.URL, err = url.Parse(t.Replace + strings.TrimPrefix(req.URL.String(), t.MatchPrefix))
+	if err != nil {
+		panic(err)
+	}
+	resp, err := rt.RoundTrip(&req1)
+	if resp != nil {
+		resp.Request = req
+	}
+	return resp, err
+}
