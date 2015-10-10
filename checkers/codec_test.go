@@ -140,7 +140,7 @@ func (s *CheckerSuite) TestYAMLEquals(c *gc.C) {
 			descr:    "illegal obtained content",
 			obtained: `{"NotThere": `,
 			result:   false,
-			msg:      `cannot unmarshal obtained contents: YAML error: .*`,
+			msg:      `cannot unmarshal obtained contents: yaml: line 1: .*`,
 		},
 	}
 	for i, test := range tests {
