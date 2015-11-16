@@ -4,6 +4,7 @@
 package testing
 
 import (
+	"fmt"
 	"sync"
 
 	jc "github.com/juju/testing/checkers"
@@ -120,6 +121,16 @@ func (f *Stub) NextErr() error {
 	err := f.errors[0]
 	f.errors = f.errors[1:]
 	return err
+}
+
+// PopNoErr pops off the next error without returning it. If the error
+// is not nil then PopNoErr panics.
+//
+// PopNoErr is useful in stub methods that do not return an error.
+func (f *Stub) PopNoErr() {
+	if err := f.NextErr(); err != nil {
+		panic(fmt.Sprintf("unexpected error set: %v", err))
+	}
 }
 
 func (f *Stub) addCall(rcvr interface{}, funcName string, args []interface{}) {

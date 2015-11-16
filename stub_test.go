@@ -110,6 +110,37 @@ func (s *stubSuite) TestNextErrEmbeddedMixed(c *gc.C) {
 	c.Check(err4, gc.Equals, exp2)
 }
 
+func (s *stubSuite) TestPopNoErrOkay(c *gc.C) {
+	exp1 := errors.New("<failure 1>")
+	exp2 := errors.New("<failure 2>")
+	s.stub.SetErrors(exp1, nil, exp2)
+
+	err1 := s.stub.NextErr()
+	s.stub.PopNoErr()
+	err2 := s.stub.NextErr()
+
+	c.Check(err1, gc.Equals, exp1)
+	c.Check(err2, gc.Equals, exp2)
+}
+
+func (s *stubSuite) TestPopNoErrEmpty(c *gc.C) {
+	s.stub.PopNoErr()
+	err := s.stub.NextErr()
+
+	c.Check(err, jc.ErrorIsNil)
+}
+
+func (s *stubSuite) TestPopNoErrPanic(c *gc.C) {
+	failure := errors.New("<failure>")
+	s.stub.SetErrors(failure)
+
+	f := func() {
+		s.stub.PopNoErr()
+	}
+
+	c.Check(f, gc.PanicMatches, `unexpected error set: <failure>`)
+}
+
 func (s *stubSuite) TestAddCallRecorded(c *gc.C) {
 	s.stub.AddCall("aFunc", 1, 2, 3)
 
