@@ -423,3 +423,11 @@ func (s *stubSuite) TestCheckCallNamesWrongName(c *gc.C) {
 	c.ExpectFailure(`the "standard" Stub.CheckCallNames call should fail here`)
 	s.stub.CheckCallNames(c, "first", "second", "third")
 }
+
+func (s *stubSuite) TestCheckNoCalls(c *gc.C) {
+	s.stub.CheckNoCalls(c)
+
+	s.stub.AddCall("method", "arg")
+	c.ExpectFailure(`the "standard" Stub.CheckNoCalls call should fail here`)
+	s.stub.CheckNoCalls(c)
+}

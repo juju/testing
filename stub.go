@@ -222,6 +222,11 @@ func (f *Stub) CheckCallNames(c *gc.C, expected ...string) bool {
 	return c.Check(funcNames, jc.DeepEquals, expected)
 }
 
+// CheckNoCalls verifies that none of the stub's methods have been called.
+func (f *Stub) CheckNoCalls(c *gc.C) {
+	f.CheckCalls(c, nil)
+}
+
 // CheckErrors verifies that the list of errors is matches the expected list.
 func (f *Stub) CheckErrors(c *gc.C, expected ...error) bool {
 	f.mu.Lock()
