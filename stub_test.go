@@ -116,7 +116,7 @@ func (s *stubSuite) TestPopNoErrOkay(c *gc.C) {
 	s.stub.SetErrors(exp1, nil, exp2)
 
 	err1 := s.stub.NextErr()
-	s.stub.PopNoErr()
+	s.stub.PopNoErr(c)
 	err2 := s.stub.NextErr()
 
 	c.Check(err1, gc.Equals, exp1)
@@ -124,7 +124,7 @@ func (s *stubSuite) TestPopNoErrOkay(c *gc.C) {
 }
 
 func (s *stubSuite) TestPopNoErrEmpty(c *gc.C) {
-	s.stub.PopNoErr()
+	s.stub.PopNoErr(c)
 	err := s.stub.NextErr()
 
 	c.Check(err, jc.ErrorIsNil)
@@ -134,11 +134,8 @@ func (s *stubSuite) TestPopNoErrPanic(c *gc.C) {
 	failure := errors.New("<failure>")
 	s.stub.SetErrors(failure)
 
-	f := func() {
-		s.stub.PopNoErr()
-	}
-
-	c.Check(f, gc.PanicMatches, `unexpected error set: <failure>`)
+	c.ExpectFailure(`Stub.PopNoErr() should fail when there is an error`)
+	s.stub.PopNoErr(c)
 }
 
 func (s *stubSuite) TestAddCallRecorded(c *gc.C) {
