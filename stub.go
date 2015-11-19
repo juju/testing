@@ -123,7 +123,7 @@ func (f *Stub) NextErr() error {
 }
 
 // PopNoErr pops off the next error without returning it. If the error
-// is not nil then PopNoErr panics.
+// is not nil then PopNoErr will fail an assertion.
 //
 // PopNoErr is useful in stub methods that do not return an error.
 func (f *Stub) PopNoErr(c *gc.C) {
