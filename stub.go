@@ -4,6 +4,7 @@
 package testing
 
 import (
+	"fmt"
 	"sync"
 
 	jc "github.com/juju/testing/checkers"
@@ -122,6 +123,16 @@ func (f *Stub) NextErr() error {
 	return err
 }
 
+// PopNoErr pops off the next error without returning it. If the error
+// is not nil then PopNoErr will panic.
+//
+// PopNoErr is useful in stub methods that do not return an error.
+func (f *Stub) PopNoErr() {
+	if err := f.NextErr(); err != nil {
+		panic(fmt.Sprintf("expected a nil error, got %v", err))
+	}
+}
+
 func (f *Stub) addCall(rcvr interface{}, funcName string, args []interface{}) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -209,6 +220,11 @@ func (f *Stub) CheckCallNames(c *gc.C, expected ...string) bool {
 	defer f.mu.Unlock()
 	funcNames := stubCallNames(f.calls...)
 	return c.Check(funcNames, jc.DeepEquals, expected)
+}
+
+// CheckNoCalls verifies that none of the stub's methods have been called.
+func (f *Stub) CheckNoCalls(c *gc.C) {
+	f.CheckCalls(c, nil)
 }
 
 // CheckErrors verifies that the list of errors is matches the expected list.

@@ -110,6 +110,36 @@ func (s *stubSuite) TestNextErrEmbeddedMixed(c *gc.C) {
 	c.Check(err4, gc.Equals, exp2)
 }
 
+func (s *stubSuite) TestPopNoErrOkay(c *gc.C) {
+	exp1 := errors.New("<failure 1>")
+	exp2 := errors.New("<failure 2>")
+	s.stub.SetErrors(exp1, nil, exp2)
+
+	err1 := s.stub.NextErr()
+	s.stub.PopNoErr()
+	err2 := s.stub.NextErr()
+
+	c.Check(err1, gc.Equals, exp1)
+	c.Check(err2, gc.Equals, exp2)
+}
+
+func (s *stubSuite) TestPopNoErrEmpty(c *gc.C) {
+	s.stub.PopNoErr()
+	err := s.stub.NextErr()
+
+	c.Check(err, jc.ErrorIsNil)
+}
+
+func (s *stubSuite) TestPopNoErrPanic(c *gc.C) {
+	failure := errors.New("<failure>")
+	s.stub.SetErrors(failure)
+
+	f := func() {
+		s.stub.PopNoErr()
+	}
+	c.Check(f, gc.PanicMatches, `expected a nil error, got .*`)
+}
+
 func (s *stubSuite) TestAddCallRecorded(c *gc.C) {
 	s.stub.AddCall("aFunc", 1, 2, 3)
 
@@ -391,4 +421,12 @@ func (s *stubSuite) TestCheckCallNamesWrongName(c *gc.C) {
 
 	c.ExpectFailure(`the "standard" Stub.CheckCallNames call should fail here`)
 	s.stub.CheckCallNames(c, "first", "second", "third")
+}
+
+func (s *stubSuite) TestCheckNoCalls(c *gc.C) {
+	s.stub.CheckNoCalls(c)
+
+	s.stub.AddCall("method", "arg")
+	c.ExpectFailure(`the "standard" Stub.CheckNoCalls call should fail here`)
+	s.stub.CheckNoCalls(c)
 }
