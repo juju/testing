@@ -34,7 +34,7 @@ func (s *BoolSuite) TestIsTrue(c *gc.C) {
 
 	result, msg = jc.IsTrue.Check([]interface{}{nil}, nil)
 	c.Assert(result, gc.Equals, false)
-	c.Assert(msg, gc.Equals, `expected type bool, received <invalid Value>`)
+	c.Assert(msg, gc.Matches, `expected type bool, received <invalid .*Value>`)
 }
 
 func (s *BoolSuite) TestIsFalse(c *gc.C) {
