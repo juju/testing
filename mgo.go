@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
@@ -482,7 +483,9 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
 	mgo.ResetStats()
-	s.Session = MgoServer.MustDial()
+	var err error
+	s.Session, err = MgoServer.Dial()
+	c.Assert(err, jc.ErrorIsNil)
 	dropAll(s.Session)
 }
 
