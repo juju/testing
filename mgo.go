@@ -496,6 +496,7 @@ func (inst *MgoInstance) Reset() {
 	// just start it again.
 	if inst.Addr() == "" {
 		if err := inst.Start(inst.certs); err != nil {
+			logger.Debugf("inst.Start(%v) failed with %v", inst.certs, err)
 			panic(err)
 		}
 		return
