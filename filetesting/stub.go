@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/juju/errors"
 	"github.com/juju/testing"
@@ -107,4 +108,62 @@ func (s *StubFile) Close() error {
 	}
 
 	return nil
+}
+
+type FileInfo struct {
+	Name    string
+	Size    int64
+	Mode    os.FileMode
+	ModTime time.Time
+}
+
+type StubFileInfo struct {
+	Stub *testing.Stub
+
+	Info      FileInfo
+	ReturnSys interface{}
+}
+
+var _ os.FileInfo = (*StubFileInfo)(nil)
+
+func (s StubFileInfo) Name() string {
+	s.Stub.AddCall("Name")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.Info.Name
+}
+
+func (s StubFileInfo) Size() int64 {
+	s.Stub.AddCall("Size")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.Info.Size
+}
+
+func (s StubFileInfo) Mode() os.FileMode {
+	s.Stub.AddCall("Mode")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.Info.Mode
+}
+
+func (s StubFileInfo) ModTime() time.Time {
+	s.Stub.AddCall("ModTime")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.Info.ModTime
+}
+
+func (s StubFileInfo) IsDir() bool {
+	s.Stub.AddCall("IsDir")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.Info.Mode.IsDir()
+}
+
+func (s StubFileInfo) Sys() interface{} {
+	s.Stub.AddCall("Sys")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.ReturnSys
 }
