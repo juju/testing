@@ -130,9 +130,9 @@ func NewStubFileInfo(stub *testing.Stub, name, content string) *StubFileInfo {
 		Stub: stub,
 		Info: FileInfo{
 			Name:    name,
-			Size:    len(content),
+			Size:    int64(len(content)),
 			Mode:    0644,
-			ModType: time.Now(),
+			ModTime: time.Now(),
 		},
 	}
 }
