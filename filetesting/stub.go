@@ -17,11 +17,10 @@ import (
 type StubFile struct {
 	Stub *testing.Stub
 
+	Info        StubFileInfo
 	ReturnRead  io.Reader
 	ReturnWrite io.Writer
-	ReturnName  string
 	ReturnSeek  int64
-	ReturnStat  os.FileInfo
 }
 
 func NewStubReader(stub *testing.Stub, content string) io.Reader {
@@ -62,7 +61,7 @@ func (s *StubFile) Name() string {
 	s.Stub.AddCall("Name")
 	s.Stub.NextErr() // Pop one off.
 
-	return s.ReturnName
+	return s.Info.Info.Name
 }
 
 func (s *StubFile) Seek(offset int64, whence int) (int64, error) {
@@ -80,7 +79,7 @@ func (s *StubFile) Stat() (os.FileInfo, error) {
 		return nil, errors.Trace(err)
 	}
 
-	return s.ReturnStat, nil
+	return &s.Info, nil
 }
 
 func (s *StubFile) Sync() error {
