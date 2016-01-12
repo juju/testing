@@ -5,6 +5,7 @@ package filetesting
 
 import (
 	"bytes"
+	"hash"
 	"io"
 	"os"
 	"strings"
@@ -210,4 +211,48 @@ func (s StubFileInfo) Sys() interface{} {
 	s.Stub.NextErr() // Pop one off.
 
 	return s.ReturnSys
+}
+
+var _ hash.Hash = (*StubHash)(nil)
+
+type StubHash struct {
+	io.Writer
+
+	Stub            *testing.Stub
+	ReturnSum       []byte
+	ReturnSize      int
+	ReturnBlockSize int
+}
+
+func NewStubHash(stub *testing.Stub) *StubHash {
+	return &StubHash{
+		Writer: &StubWriter{Stub: stub},
+		Stub:   stub,
+	}
+}
+
+func (s *StubHash) Sum(b []byte) []byte {
+	s.Stub.AddCall("Sum", b)
+	s.Stub.NextErr() // Pop one off.
+
+	return s.ReturnSum
+}
+
+func (s *StubHash) Reset() {
+	s.Stub.AddCall("Reset")
+	s.Stub.NextErr() // Pop one off.
+}
+
+func (s *StubHash) Size() int {
+	s.Stub.AddCall("Size")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.ReturnSize
+}
+
+func (s *StubHash) BlockSize() int {
+	s.Stub.AddCall("BlockSize")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.ReturnBlockSize
 }
