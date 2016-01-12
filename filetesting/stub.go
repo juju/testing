@@ -117,6 +117,8 @@ type FileInfo struct {
 	ModTime time.Time
 }
 
+var _ os.FileInfo = (*StubFileInfo)(nil)
+
 type StubFileInfo struct {
 	Stub *testing.Stub
 
@@ -124,7 +126,17 @@ type StubFileInfo struct {
 	ReturnSys interface{}
 }
 
-var _ os.FileInfo = (*StubFileInfo)(nil)
+func NewStubFileInfo(stub *testing.Stub, name, content string) *StubFileInfo {
+	return &StubFileInfo{
+		Stub: stub,
+		Info: FileInfo{
+			Name:    name,
+			Size:    len(content),
+			Mode:    0644,
+			ModType: time.Now(),
+		},
+	}
+}
 
 func (s StubFileInfo) Name() string {
 	s.Stub.AddCall("Name")
