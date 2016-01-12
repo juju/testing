@@ -34,6 +34,9 @@ func (s *StubReader) Read(data []byte) (int, error) {
 		return 0, errors.Trace(err)
 	}
 
+	if s.ReturnRead == nil {
+		return 0, nil
+	}
 	return s.ReturnRead.Read(data)
 }
 
@@ -58,6 +61,9 @@ func (s *StubWriter) Write(data []byte) (int, error) {
 		return 0, errors.Trace(err)
 	}
 
+	if s.ReturnWrite == nil {
+		return 0, nil
+	}
 	return s.ReturnWrite.Write(data)
 }
 
@@ -99,8 +105,7 @@ type StubFile struct {
 	Info StubFileInfo
 }
 
-func NewStubFile(stub *testing.Stub) *StubFile {
-	raw := new(bytes.Buffer)
+func NewStubFile(stub *testing.Stub, raw io.ReadWriter) *StubFile {
 	return &StubFile{
 		Reader: &StubReader{Stub: stub, ReturnRead: raw},
 		Writer: &StubWriter{Stub: stub, ReturnWrite: raw},
@@ -225,8 +230,7 @@ type StubHash struct {
 	ReturnBlockSize int
 }
 
-func NewStubHash(stub *testing.Stub) *StubHash {
-	raw := new(bytes.Buffer)
+func NewStubHash(stub *testing.Stub, raw io.Writer) *StubHash {
 	return &StubHash{
 		Writer: &StubWriter{Stub: stub, ReturnWrite: raw},
 		Stub:   stub,
