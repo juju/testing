@@ -14,32 +14,20 @@ import (
 	"github.com/juju/testing"
 )
 
-type StubFile struct {
+type StubReader struct {
 	Stub *testing.Stub
 
-	Info        StubFileInfo
-	ReturnRead  io.Reader
-	ReturnWrite io.Writer
-	ReturnSeek  int64
+	ReturnRead io.Reader
 }
 
 func NewStubReader(stub *testing.Stub, content string) io.Reader {
-	return &StubFile{
+	return &StubReader{
 		Stub:       stub,
 		ReturnRead: strings.NewReader(content),
 	}
 }
 
-func NewStubWriter(stub *testing.Stub) (io.Writer, *bytes.Buffer) {
-	buf := new(bytes.Buffer)
-	s := &StubFile{
-		Stub:        stub,
-		ReturnWrite: buf,
-	}
-	return s, buf
-}
-
-func (s *StubFile) Read(data []byte) (int, error) {
+func (s *StubReader) Read(data []byte) (int, error) {
 	s.Stub.AddCall("Read", data)
 	if err := s.Stub.NextErr(); err != nil {
 		return 0, errors.Trace(err)
@@ -48,7 +36,22 @@ func (s *StubFile) Read(data []byte) (int, error) {
 	return s.ReturnRead.Read(data)
 }
 
-func (s *StubFile) Write(data []byte) (int, error) {
+type StubWriter struct {
+	Stub *testing.Stub
+
+	ReturnWrite io.Writer
+}
+
+func NewStubWriter(stub *testing.Stub) (io.Writer, *bytes.Buffer) {
+	buf := new(bytes.Buffer)
+	s := &StubWriter{
+		Stub:        stub,
+		ReturnWrite: buf,
+	}
+	return s, buf
+}
+
+func (s *StubWriter) Write(data []byte) (int, error) {
 	s.Stub.AddCall("Write", data)
 	if err := s.Stub.NextErr(); err != nil {
 		return 0, errors.Trace(err)
@@ -57,20 +60,59 @@ func (s *StubFile) Write(data []byte) (int, error) {
 	return s.ReturnWrite.Write(data)
 }
 
-func (s *StubFile) Name() string {
-	s.Stub.AddCall("Name")
-	s.Stub.NextErr() // Pop one off.
+type StubSeeker struct {
+	Stub *testing.Stub
 
-	return s.Info.Info.Name
+	ReturnSeek int64
 }
 
-func (s *StubFile) Seek(offset int64, whence int) (int64, error) {
+func (s *StubSeeker) Seek(offset int64, whence int) (int64, error) {
 	s.Stub.AddCall("Seek", offset, whence)
 	if err := s.Stub.NextErr(); err != nil {
 		return 0, errors.Trace(err)
 	}
 
 	return s.ReturnSeek, nil
+}
+
+type StubCloser struct {
+	Stub *testing.Stub
+}
+
+func (s *StubCloser) Close() error {
+	s.Stub.AddCall("Close")
+	if err := s.Stub.NextErr(); err != nil {
+		return errors.Trace(err)
+	}
+
+	return nil
+}
+
+type StubFile struct {
+	io.Reader
+	io.Writer
+	io.Seeker
+	io.Closer
+
+	Stub *testing.Stub
+	Info StubFileInfo
+}
+
+func NewStubFile(stub *testing.Stub) *StubFile {
+	return &StubFile{
+		Reader: &StubReader{Stub: stub},
+		Writer: &StubWriter{Stub: stub},
+		Seeker: &StubSeeker{Stub: stub},
+		Closer: &StubCloser{Stub: stub},
+		Stub:   stub,
+	}
+}
+
+func (s *StubFile) Name() string {
+	s.Stub.AddCall("Name")
+	s.Stub.NextErr() // Pop one off.
+
+	return s.Info.Info.Name
 }
 
 func (s *StubFile) Stat() (os.FileInfo, error) {
@@ -93,15 +135,6 @@ func (s *StubFile) Sync() error {
 
 func (s *StubFile) Truncate(size int64) error {
 	s.Stub.AddCall("Truncate", size)
-	if err := s.Stub.NextErr(); err != nil {
-		return errors.Trace(err)
-	}
-
-	return nil
-}
-
-func (s *StubFile) Close() error {
-	s.Stub.AddCall("Close")
 	if err := s.Stub.NextErr(); err != nil {
 		return errors.Trace(err)
 	}
