@@ -100,9 +100,10 @@ type StubFile struct {
 }
 
 func NewStubFile(stub *testing.Stub) *StubFile {
+	raw := new(bytes.Buffer)
 	return &StubFile{
-		Reader: &StubReader{Stub: stub},
-		Writer: &StubWriter{Stub: stub},
+		Reader: &StubReader{Stub: stub, ReturnRead: raw},
+		Writer: &StubWriter{Stub: stub, ReturnWrite: raw},
 		Seeker: &StubSeeker{Stub: stub},
 		Closer: &StubCloser{Stub: stub},
 		Stub:   stub,
@@ -225,8 +226,9 @@ type StubHash struct {
 }
 
 func NewStubHash(stub *testing.Stub) *StubHash {
+	raw := new(bytes.Buffer)
 	return &StubHash{
-		Writer: &StubWriter{Stub: stub},
+		Writer: &StubWriter{Stub: stub, ReturnWrite: raw},
 		Stub:   stub,
 	}
 }
