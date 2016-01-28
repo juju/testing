@@ -87,7 +87,7 @@ func HomePath(names ...string) string {
 // joined to juju home.
 // This tool assumes ~/.config/juju as the juju home.
 func JujuHomePath(names ...string) string {
-	all := append([]string{".config", "juju"}, names...)
+	all := append([]string{".local", "share", "juju"}, names...)
 	return HomePath(all...)
 }
 
