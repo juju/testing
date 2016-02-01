@@ -82,12 +82,12 @@ func HomePath(names ...string) string {
 	return filepath.Join(all...)
 }
 
-// JujuHomePath returns the test home path, it is just a convenience
+// JujuDataPath returns the test home path, it is just a convenience
 // for tests, if extra path snippets are passed they will be
 // joined to juju home.
 // This tool assumes ~/.config/juju as the juju home.
-func JujuHomePath(names ...string) string {
-	all := append([]string{".config", "juju"}, names...)
+func JujuDataPath(names ...string) string {
+	all := append([]string{".local", "share", "juju"}, names...)
 	return HomePath(all...)
 }
 
