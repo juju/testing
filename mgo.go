@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
@@ -410,16 +411,6 @@ func (s *MgoSuite) TearDownSuite(c *gc.C) {
 	utils.FastInsecureHash = false
 }
 
-// MustDial returns a new connection to the MongoDB server, and panics on
-// errors.
-func (inst *MgoInstance) MustDial() *mgo.Session {
-	s, err := mgo.DialWithInfo(inst.DialInfo())
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
 // Dial returns a new connection to the MongoDB server.
 func (inst *MgoInstance) Dial() (*mgo.Session, error) {
 	return mgo.DialWithInfo(inst.DialInfo())
@@ -490,19 +481,18 @@ func (s *MgoSuite) SetUpTest(c *gc.C) {
 	dropAll(s.Session)
 }
 
-// Reset deletes all content from the MongoDB server and panics if it encounters
-// errors.
-func (inst *MgoInstance) Reset() {
+// Reset deletes all content from the MongoDB server.
+func (inst *MgoInstance) Reset() error {
 	// If the server has already been destroyed for testing purposes,
 	// just start it again.
 	if inst.Addr() == "" {
-		if err := inst.Start(inst.certs); err != nil {
-			logger.Debugf("inst.Start(%v) failed with %v", inst.certs, err)
-			panic(err)
-		}
-		return
+		err := inst.Start(inst.certs)
+		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
 	}
-	session := inst.MustDial()
+	session, err := inst.Dial()
+	if err != nil {
+		return errors.Annotate(err, "inst.Dial() failed")
+	}
 	defer session.Close()
 
 	dbnames, ok := resetAdminPasswordAndFetchDBNames(session)
@@ -511,10 +501,8 @@ func (inst *MgoInstance) Reset() {
 		// happen when tests fail.
 		logger.Infof("restarting MongoDB server after unauthorized access")
 		inst.Destroy()
-		if err := inst.Start(inst.certs); err != nil {
-			panic(err)
-		}
-		return
+		err := inst.Start(inst.certs)
+		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
 	}
 	logger.Infof("reset successfully reset admin password")
 	for _, name := range dbnames {
@@ -524,9 +512,10 @@ func (inst *MgoInstance) Reset() {
 			continue
 		}
 		if err := session.DB(name).DropDatabase(); err != nil {
-			panic(fmt.Errorf("Cannot drop MongoDB database %v: %v", name, err))
+			return errors.Annotatef(err, "cannot drop MongoDB database %v", name)
 		}
 	}
+	return nil
 }
 
 // dropAll drops all databases apart from admin, local and config.
@@ -607,7 +596,8 @@ func isUnauthorized(err error) bool {
 }
 
 func (s *MgoSuite) TearDownTest(c *gc.C) {
-	MgoServer.Reset()
+	err := MgoServer.Reset()
+	c.Assert(err, jc.ErrorIsNil)
 	s.Session.Close()
 	for i := 0; ; i++ {
 		stats := mgo.GetStats()
