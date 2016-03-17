@@ -114,13 +114,17 @@ func (s *cleanupSuite) TestPatchValueFunction(c *gc.C) {
 	s.SetUpTest(c)
 }
 
+// noopCleanup is a simple function that does nothing that can be passed to
+// AddCleanup
+func noopCleanup(*gc.C) {
+}
+
 func (s cleanupSuite) TestAddCleanupPanicIfUnsafe(c *gc.C) {
 	// It is unsafe to call AddCleanup when the test itself is not a
 	// pointer receiver, because AddCleanup modifies the s.testStack
 	// attribute, but in a non-pointer receiver, that object is lost when
 	// the Test function returns.
 	// This Test must, itself, be a non pointer receiver to trigger this
-	noopCleanup := func(*gc.C) {}
 	c.Assert(func() { s.AddCleanup(noopCleanup) },
 		gc.PanicMatches,
 		"unsafe to call AddCleanup from non pointer receiver test")
@@ -132,8 +136,33 @@ func (s cleanupSuite) TestAddSuiteCleanupPanicIfUnsafe(c *gc.C) {
 	// attribute, but in a non-pointer receiver, that object is lost when
 	// the Test function returns.
 	// This Test must, itself, be a non pointer receiver to trigger this
-	noopCleanup := func(*gc.C) {}
 	c.Assert(func() { s.AddSuiteCleanup(noopCleanup) },
 		gc.PanicMatches,
 		"unsafe to call AddSuiteCleanup from non pointer receiver test")
+}
+
+type cleanupUnsafeSuite struct {
+	testing.CleanupSuite
+}
+
+var _ = gc.Suite(&cleanupUnsafeSuite{})
+
+func (s *cleanupUnsafeSuite) SetUpSuite(c *gc.C) {
+	s.CleanupSuite.SetUpSuite(c)
+	c.Assert(func() { s.AddCleanup(noopCleanup) },
+		gc.PanicMatches,
+		"unsafe to call AddCleanup outside of a Test context")
+}
+
+func (s *cleanupUnsafeSuite) TestAddCleanup(c *gc.C) {
+	// this should be safe to do
+	s.AddCleanup(noopCleanup)
+}
+
+func (s *cleanupUnsafeSuite) TearDownSuite(c *gc.C) {
+	s.CleanupSuite.TearDownSuite(c)
+
+	c.Assert(func() { s.AddSuiteCleanup(noopCleanup) },
+		gc.PanicMatches,
+		"unsafe to call AddSuiteCleanup without a Suite")
 }

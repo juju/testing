@@ -29,6 +29,7 @@ func (s *CleanupSuite) SetUpSuite(c *gc.C) {
 
 func (s *CleanupSuite) TearDownSuite(c *gc.C) {
 	s.callStack(c, s.suiteStack)
+	s.suiteSuite = nil
 }
 
 func (s *CleanupSuite) SetUpTest(c *gc.C) {
@@ -38,6 +39,7 @@ func (s *CleanupSuite) SetUpTest(c *gc.C) {
 
 func (s *CleanupSuite) TearDownTest(c *gc.C) {
 	s.callStack(c, s.testStack)
+	s.testSuite = nil
 }
 
 func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
@@ -49,6 +51,16 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 // AddCleanup pushes the cleanup function onto the stack of functions to be
 // called during TearDownTest.
 func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
+	if s.testSuite == nil {
+		// if testSuite is nil, that means we are either before
+		// SetUpTest or after TearDownTest. Either way, the lifetime of
+		// AddCleanup is that it will get cleaned up in TearDownTest,
+		// but that has either already been run, or won't be run when
+		// you think it will. (eg If you call AddCleanup during
+		// SetUpSuite, then the cleanup will be triggered after the
+		// first test, not during the TearDownSuite.)
+		panic("unsafe to call AddCleanup outside of a Test context")
+	}
 	if s != s.testSuite {
 		panic("unsafe to call AddCleanup from non pointer receiver test")
 	}
@@ -58,7 +70,13 @@ func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
 // AddSuiteCleanup pushes the cleanup function onto the stack of functions to
 // be called during TearDownSuite.
 func (s *CleanupSuite) AddSuiteCleanup(cleanup CleanupFunc) {
-	if s != s.testSuite {
+	if s.suiteSuite == nil {
+		// This is either called before SetUpSuite or after
+		// TearDownSuite. Either way, we can't really trust that we're
+		// going to call Cleanup correctly.
+		panic("unsafe to call AddSuiteCleanup without a Suite")
+	}
+	if s != s.suiteSuite {
 		panic("unsafe to call AddSuiteCleanup from non pointer receiver test")
 	}
 	s.suiteStack = append(s.suiteStack, cleanup)
