@@ -113,3 +113,27 @@ func (s *cleanupSuite) TestPatchValueFunction(c *gc.C) {
 	// being called again.
 	s.SetUpTest(c)
 }
+
+func (s cleanupSuite) TestAddCleanupPanicIfUnsafe(c *gc.C) {
+	// It is unsafe to call AddCleanup when the test itself is not a
+	// pointer receiver, because AddCleanup modifies the s.testStack
+	// attribute, but in a non-pointer receiver, that object is lost when
+	// the Test function returns.
+	// This Test must, itself, be a non pointer receiver to trigger this
+	noopCleanup := func(*gc.C) {}
+	c.Assert(func() { s.AddCleanup(noopCleanup) },
+		gc.PanicMatches,
+		"unsafe to call AddCleanup from non pointer receiver test")
+}
+
+func (s cleanupSuite) TestAddSuiteCleanupPanicIfUnsafe(c *gc.C) {
+	// It is unsafe to call AddSuiteCleanup when the test itself is not a
+	// pointer receiver, because AddSuiteCleanup modifies the s.suiteStack
+	// attribute, but in a non-pointer receiver, that object is lost when
+	// the Test function returns.
+	// This Test must, itself, be a non pointer receiver to trigger this
+	noopCleanup := func(*gc.C) {}
+	c.Assert(func() { s.AddSuiteCleanup(noopCleanup) },
+		gc.PanicMatches,
+		"unsafe to call AddSuiteCleanup from non pointer receiver test")
+}

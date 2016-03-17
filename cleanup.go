@@ -18,10 +18,13 @@ type cleanupStack []CleanupFunc
 type CleanupSuite struct {
 	testStack  cleanupStack
 	suiteStack cleanupStack
+	suiteSuite *CleanupSuite
+	testSuite  *CleanupSuite
 }
 
 func (s *CleanupSuite) SetUpSuite(c *gc.C) {
 	s.suiteStack = nil
+	s.suiteSuite = s
 }
 
 func (s *CleanupSuite) TearDownSuite(c *gc.C) {
@@ -30,6 +33,7 @@ func (s *CleanupSuite) TearDownSuite(c *gc.C) {
 
 func (s *CleanupSuite) SetUpTest(c *gc.C) {
 	s.testStack = nil
+	s.testSuite = s
 }
 
 func (s *CleanupSuite) TearDownTest(c *gc.C) {
@@ -45,12 +49,18 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 // AddCleanup pushes the cleanup function onto the stack of functions to be
 // called during TearDownTest.
 func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
+	if s != s.testSuite {
+		panic("unsafe to call AddCleanup from non pointer receiver test")
+	}
 	s.testStack = append(s.testStack, cleanup)
 }
 
 // AddSuiteCleanup pushes the cleanup function onto the stack of functions to
 // be called during TearDownSuite.
 func (s *CleanupSuite) AddSuiteCleanup(cleanup CleanupFunc) {
+	if s != s.testSuite {
+		panic("unsafe to call AddSuiteCleanup from non pointer receiver test")
+	}
 	s.suiteStack = append(s.suiteStack, cleanup)
 }
 
