@@ -114,66 +114,59 @@ func (s cleanupSuite) TestAddCleanupPanicIfUnsafe(c *gc.C) {
 }
 
 type cleanupSuiteAndTestLifetimes struct {
-	testing.CleanupSuite
 }
 
 var _ = gc.Suite(&cleanupSuiteAndTestLifetimes{})
 
-func (s *cleanupSuiteAndTestLifetimes) SetUpSuite(c *gc.C) {
-	// We intentionally don't call s.CleanupSuite.SetUpSuite() so that the
-	// tests can do that themselves.
-}
-
-func (s *cleanupSuiteAndTestLifetimes) TearDownSuite(c *gc.C) {
-	// We intentionally don't call s.CleanupSuite.TearDownSuite() so that the
-	// tests can do that themselves.
-}
-
-func (s *cleanupSuiteAndTestLifetimes) SetUpTest(c *gc.C) {
-	// We intentionally don't call s.CleanupSuite.SetUpTest() so that the
-	// tests can do that themselves.
-}
-
-func (s *cleanupSuiteAndTestLifetimes) TearDownTest(c *gc.C) {
-	// We intentionally don't call s.CleanupSuite.TearDownTest() so that the
-	// tests can do that themselves.
-}
-
 func (s *cleanupSuiteAndTestLifetimes) TestAddCleanupBeforeSetUpSuite(c *gc.C) {
-	c.Assert(func() { s.AddCleanup(noopCleanup) },
+	suite := &testing.CleanupSuite{}
+	c.Assert(func() { suite.AddCleanup(noopCleanup) },
 		gc.PanicMatches,
-		"unsafe to call AddCleanup without a Suite")
-	s.CleanupSuite.SetUpSuite(c)
-	s.CleanupSuite.SetUpTest(c)
-	s.CleanupSuite.TearDownTest(c)
-	s.CleanupSuite.TearDownSuite(c)
+		"unsafe to call AddCleanup before SetUpSuite")
+	suite.SetUpSuite(c)
+	suite.SetUpTest(c)
+	suite.TearDownTest(c)
+	suite.TearDownSuite(c)
 }
 
 func (s *cleanupSuiteAndTestLifetimes) TestAddCleanupAfterTearDownSuite(c *gc.C) {
-	s.CleanupSuite.SetUpSuite(c)
-	s.CleanupSuite.SetUpTest(c)
-	s.CleanupSuite.TearDownTest(c)
-	s.CleanupSuite.TearDownSuite(c)
-	c.Assert(func() { s.AddCleanup(noopCleanup) },
+	suite := &testing.CleanupSuite{}
+	suite.SetUpSuite(c)
+	suite.SetUpTest(c)
+	suite.TearDownTest(c)
+	suite.TearDownSuite(c)
+	c.Assert(func() { suite.AddCleanup(noopCleanup) },
 		gc.PanicMatches,
-		"unsafe to call AddCleanup without a Suite")
+		"unsafe to call AddCleanup after TearDownSuite")
 }
 
 func (s *cleanupSuiteAndTestLifetimes) TestAddCleanupMixedSuiteAndTest(c *gc.C) {
 	calls := []string{}
-	s.CleanupSuite.SetUpSuite(c)
-	s.AddCleanup(func(*gc.C) { calls = append(calls, "before SetUpTest") })
-	s.CleanupSuite.SetUpTest(c)
-	s.AddCleanup(func(*gc.C) { calls = append(calls, "during Test") })
-	s.CleanupSuite.TearDownTest(c)
+	suite := &testing.CleanupSuite{}
+	suite.SetUpSuite(c)
+	suite.AddCleanup(func(*gc.C) { calls = append(calls, "before SetUpTest") })
+	suite.SetUpTest(c)
+	suite.AddCleanup(func(*gc.C) { calls = append(calls, "during Test1") })
+	suite.TearDownTest(c)
 	c.Check(calls, gc.DeepEquals, []string{
-		"during Test",
+		"during Test1",
 	})
-	s.AddCleanup(func(*gc.C) { calls = append(calls, "after TearDownTest") })
-	s.CleanupSuite.TearDownSuite(c)
+	c.Assert(func() { suite.AddCleanup(noopCleanup) },
+		gc.PanicMatches,
+		"unsafe to call AddCleanup after a test has been torn down"+
+			" before a new test has been set up"+
+			" \\(Suite level changes only make sense before first test is run\\)")
+	suite.SetUpTest(c)
+	suite.AddCleanup(func(*gc.C) { calls = append(calls, "during Test2") })
+	suite.TearDownTest(c)
 	c.Check(calls, gc.DeepEquals, []string{
-		"during Test",
-		"after TearDownTest",
+		"during Test1",
+		"during Test2",
+	})
+	suite.TearDownSuite(c)
+	c.Check(calls, gc.DeepEquals, []string{
+		"during Test1",
+		"during Test2",
 		"before SetUpTest",
 	})
 }

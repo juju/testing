@@ -16,30 +16,38 @@ type cleanupStack []CleanupFunc
 // during either test tear down or suite tear down depending on the method
 // called.
 type CleanupSuite struct {
-	testStack  cleanupStack
-	suiteStack cleanupStack
-	suiteSuite *CleanupSuite
-	testSuite  *CleanupSuite
+	testStack    cleanupStack
+	suiteStack   cleanupStack
+	origSuite    *CleanupSuite
+	testsStarted bool
+	inTest       bool
+	tornDown     bool
 }
 
 func (s *CleanupSuite) SetUpSuite(c *gc.C) {
 	s.suiteStack = nil
-	s.suiteSuite = s
+	s.testStack = nil
+	s.origSuite = s
+	s.testsStarted = false
+	s.inTest = false
+	s.tornDown = false
 }
 
 func (s *CleanupSuite) TearDownSuite(c *gc.C) {
 	s.callStack(c, s.suiteStack)
-	s.suiteSuite = nil
+	s.origSuite = nil
+	s.tornDown = true
 }
 
 func (s *CleanupSuite) SetUpTest(c *gc.C) {
 	s.testStack = nil
-	s.testSuite = s
+	s.testsStarted = true
+	s.inTest = true
 }
 
 func (s *CleanupSuite) TearDownTest(c *gc.C) {
 	s.callStack(c, s.testStack)
-	s.testSuite = nil
+	s.inTest = false
 }
 
 func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
@@ -52,25 +60,41 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 // called during TearDownTest or TearDownSuite. TearDownTest will be used if
 // SetUpTest has already been called, else we will use TearDownSuite
 func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
-	if s.suiteSuite == nil {
+	if s.origSuite == nil {
 		// This is either called before SetUpSuite or after
 		// TearDownSuite. Either way, we can't really trust that we're
 		// going to call Cleanup correctly.
-		panic("unsafe to call AddCleanup without a Suite")
+		if s.tornDown {
+			panic("unsafe to call AddCleanup after TearDownSuite")
+		} else {
+			panic("unsafe to call AddCleanup before SetUpSuite")
+		}
 	}
-	if s != s.suiteSuite {
+	if s != s.origSuite {
 		// If you write a test like:
 		// func (s MySuite) TestFoo(c *gc.C) {
 		//   s.AddCleanup(foo)
 		// }
 		// The AddCleanup call is unsafe because it modifes
-		// s.suiteSuite but that object disappears once TestFoo
+		// s.origSuite but that object disappears once TestFoo
 		// returns. So you have to use:
 		// func (s *MySuite) TestFoo(c *gc.C) if you want the Cleanup
 		// funcs.
 		panic("unsafe to call AddCleanup from non pointer receiver test")
 	}
-	if s.testSuite == nil {
+	if !s.inTest {
+		if s.testsStarted {
+			// This indicates that we are not currently in a test
+			// (inTest is false), but that we have already run a
+			// test for this test suite (testStarted is true).
+			// Making a Suite-level change here means that only
+			// some of the tests in the suite will see the change,
+			// which means it *isn't* a Suite (applies to all
+			// tests) level change.
+			panic("unsafe to call AddCleanup after a test has been torn down" +
+				" before a new test has been set up" +
+				" (Suite level changes only make sense before first test is run)")
+		}
 		// We either haven't called SetUpTest or we've already called
 		// TearDownTest, consider this a Suite level cleanup.
 		s.suiteStack = append(s.suiteStack, cleanup)
