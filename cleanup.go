@@ -76,9 +76,6 @@ func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
 		s.suiteStack = append(s.suiteStack, cleanup)
 		return
 	}
-	if s != s.testSuite {
-		panic("unsafe to call AddCleanup from non pointer receiver test")
-	}
 	s.testStack = append(s.testStack, cleanup)
 }
 
