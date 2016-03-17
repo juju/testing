@@ -25,11 +25,17 @@ var _ = gc.Suite(&fakeHomeSuite{})
 func (s *fakeHomeSuite) SetUpSuite(c *gc.C) {
 	s.IsolationSuite.SetUpSuite(c)
 	s.fakeHomeSuite = testing.FakeHomeSuite{}
+	s.fakeHomeSuite.SetUpSuite(c)
 }
 
 func (s *fakeHomeSuite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
 	utils.SetHome("/tmp/tests")
+}
+
+func (s *fakeHomeSuite) TearDownSuite(c *gc.C) {
+	s.fakeHomeSuite.TearDownSuite(c)
+	s.IsolationSuite.TearDownSuite(c)
 }
 
 func (s *fakeHomeSuite) TestHomeCreated(c *gc.C) {

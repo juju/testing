@@ -29,23 +29,6 @@ func (s *cleanupSuite) TestTearDownTestEmpty(c *gc.C) {
 	s.SetUpTest(c)
 }
 
-func (s *cleanupSuite) TestAddSuiteCleanup(c *gc.C) {
-	order := []string{}
-	s.AddSuiteCleanup(func(*gc.C) {
-		order = append(order, "first")
-	})
-	s.AddSuiteCleanup(func(*gc.C) {
-		order = append(order, "second")
-	})
-
-	s.TearDownSuite(c)
-	c.Assert(order, gc.DeepEquals, []string{"second", "first"})
-
-	// SetUpSuite resets the cleanup stack, this stops the cleanup functions
-	// being called again.
-	s.SetUpSuite(c)
-}
-
 func (s *cleanupSuite) TestAddCleanup(c *gc.C) {
 	order := []string{}
 	s.AddCleanup(func(*gc.C) {
@@ -130,39 +113,67 @@ func (s cleanupSuite) TestAddCleanupPanicIfUnsafe(c *gc.C) {
 		"unsafe to call AddCleanup from non pointer receiver test")
 }
 
-func (s cleanupSuite) TestAddSuiteCleanupPanicIfUnsafe(c *gc.C) {
-	// It is unsafe to call AddSuiteCleanup when the test itself is not a
-	// pointer receiver, because AddSuiteCleanup modifies the s.suiteStack
-	// attribute, but in a non-pointer receiver, that object is lost when
-	// the Test function returns.
-	// This Test must, itself, be a non pointer receiver to trigger this
-	c.Assert(func() { s.AddSuiteCleanup(noopCleanup) },
-		gc.PanicMatches,
-		"unsafe to call AddSuiteCleanup from non pointer receiver test")
-}
-
-type cleanupUnsafeSuite struct {
+type cleanupSuiteAndTestLifetimes struct {
 	testing.CleanupSuite
 }
 
-var _ = gc.Suite(&cleanupUnsafeSuite{})
+var _ = gc.Suite(&cleanupSuiteAndTestLifetimes{})
 
-func (s *cleanupUnsafeSuite) SetUpSuite(c *gc.C) {
-	s.CleanupSuite.SetUpSuite(c)
+func (s *cleanupSuiteAndTestLifetimes) SetUpSuite(c *gc.C) {
+	// We intentionally don't call s.CleanupSuite.SetUpSuite() so that the
+	// tests can do that themselves.
+}
+
+func (s *cleanupSuiteAndTestLifetimes) TearDownSuite(c *gc.C) {
+	// We intentionally don't call s.CleanupSuite.TearDownSuite() so that the
+	// tests can do that themselves.
+}
+
+func (s *cleanupSuiteAndTestLifetimes) SetUpTest(c *gc.C) {
+	// We intentionally don't call s.CleanupSuite.SetUpTest() so that the
+	// tests can do that themselves.
+}
+
+func (s *cleanupSuiteAndTestLifetimes) TearDownTest(c *gc.C) {
+	// We intentionally don't call s.CleanupSuite.TearDownTest() so that the
+	// tests can do that themselves.
+}
+
+func (s *cleanupSuiteAndTestLifetimes) TestAddCleanupBeforeSetUpSuite(c *gc.C) {
 	c.Assert(func() { s.AddCleanup(noopCleanup) },
 		gc.PanicMatches,
-		"unsafe to call AddCleanup outside of a Test context")
-}
-
-func (s *cleanupUnsafeSuite) TestAddCleanup(c *gc.C) {
-	// this should be safe to do
-	s.AddCleanup(noopCleanup)
-}
-
-func (s *cleanupUnsafeSuite) TearDownSuite(c *gc.C) {
+		"unsafe to call AddCleanup without a Suite")
+	s.CleanupSuite.SetUpSuite(c)
+	s.CleanupSuite.SetUpTest(c)
+	s.CleanupSuite.TearDownTest(c)
 	s.CleanupSuite.TearDownSuite(c)
+}
 
-	c.Assert(func() { s.AddSuiteCleanup(noopCleanup) },
+func (s *cleanupSuiteAndTestLifetimes) TestAddCleanupAfterTearDownSuite(c *gc.C) {
+	s.CleanupSuite.SetUpSuite(c)
+	s.CleanupSuite.SetUpTest(c)
+	s.CleanupSuite.TearDownTest(c)
+	s.CleanupSuite.TearDownSuite(c)
+	c.Assert(func() { s.AddCleanup(noopCleanup) },
 		gc.PanicMatches,
-		"unsafe to call AddSuiteCleanup without a Suite")
+		"unsafe to call AddCleanup without a Suite")
+}
+
+func (s *cleanupSuiteAndTestLifetimes) TestAddCleanupMixedSuiteAndTest(c *gc.C) {
+	calls := []string{}
+	s.CleanupSuite.SetUpSuite(c)
+	s.AddCleanup(func(*gc.C) { calls = append(calls, "before SetUpTest") })
+	s.CleanupSuite.SetUpTest(c)
+	s.AddCleanup(func(*gc.C) { calls = append(calls, "during Test") })
+	s.CleanupSuite.TearDownTest(c)
+	c.Check(calls, gc.DeepEquals, []string{
+		"during Test",
+	})
+	s.AddCleanup(func(*gc.C) { calls = append(calls, "after TearDownTest") })
+	s.CleanupSuite.TearDownSuite(c)
+	c.Check(calls, gc.DeepEquals, []string{
+		"during Test",
+		"after TearDownTest",
+		"before SetUpTest",
+	})
 }

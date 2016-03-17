@@ -49,17 +49,32 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 }
 
 // AddCleanup pushes the cleanup function onto the stack of functions to be
-// called during TearDownTest.
+// called during TearDownTest or TearDownSuite. TearDownTest will be used if
+// SetUpTest has already been called, else we will use TearDownSuite
 func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
+	if s.suiteSuite == nil {
+		// This is either called before SetUpSuite or after
+		// TearDownSuite. Either way, we can't really trust that we're
+		// going to call Cleanup correctly.
+		panic("unsafe to call AddCleanup without a Suite")
+	}
+	if s != s.suiteSuite {
+		// If you write a test like:
+		// func (s MySuite) TestFoo(c *gc.C) {
+		//   s.AddCleanup(foo)
+		// }
+		// The AddCleanup call is unsafe because it modifes
+		// s.suiteSuite but that object disappears once TestFoo
+		// returns. So you have to use:
+		// func (s *MySuite) TestFoo(c *gc.C) if you want the Cleanup
+		// funcs.
+		panic("unsafe to call AddCleanup from non pointer receiver test")
+	}
 	if s.testSuite == nil {
-		// if testSuite is nil, that means we are either before
-		// SetUpTest or after TearDownTest. Either way, the lifetime of
-		// AddCleanup is that it will get cleaned up in TearDownTest,
-		// but that has either already been run, or won't be run when
-		// you think it will. (eg If you call AddCleanup during
-		// SetUpSuite, then the cleanup will be triggered after the
-		// first test, not during the TearDownSuite.)
-		panic("unsafe to call AddCleanup outside of a Test context")
+		// We either haven't called SetUpTest or we've already called
+		// TearDownTest, consider this a Suite level cleanup.
+		s.suiteStack = append(s.suiteStack, cleanup)
+		return
 	}
 	if s != s.testSuite {
 		panic("unsafe to call AddCleanup from non pointer receiver test")
@@ -67,19 +82,11 @@ func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
 	s.testStack = append(s.testStack, cleanup)
 }
 
-// AddSuiteCleanup pushes the cleanup function onto the stack of functions to
-// be called during TearDownSuite.
+// AddSuiteCleanup is deprecated. Just call AddCleanup and it will use the
+// right lifetime for when to call the cleanup based on whether we are in a
+// Test right now or not.
 func (s *CleanupSuite) AddSuiteCleanup(cleanup CleanupFunc) {
-	if s.suiteSuite == nil {
-		// This is either called before SetUpSuite or after
-		// TearDownSuite. Either way, we can't really trust that we're
-		// going to call Cleanup correctly.
-		panic("unsafe to call AddSuiteCleanup without a Suite")
-	}
-	if s != s.suiteSuite {
-		panic("unsafe to call AddSuiteCleanup from non pointer receiver test")
-	}
-	s.suiteStack = append(s.suiteStack, cleanup)
+	s.AddCleanup(cleanup)
 }
 
 // PatchEnvironment sets the environment variable 'name' the the value passed
