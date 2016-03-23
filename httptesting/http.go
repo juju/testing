@@ -217,13 +217,15 @@ func DoRequest(c *gc.C, p DoRequestParams) *httptest.ResponseRecorder {
 		return nil
 	}
 	defer resp.Body.Close()
-	var rec httptest.ResponseRecorder
-	rec.HeaderMap = resp.Header
-	rec.Code = resp.StatusCode
-	rec.Body = new(bytes.Buffer)
+	rec := httptest.NewRecorder()
+	h := rec.Header()
+	for k, v := range resp.Header {
+		h[k] = v
+	}
+	rec.WriteHeader(resp.StatusCode)
 	_, err := io.Copy(rec.Body, resp.Body)
 	c.Assert(err, jc.ErrorIsNil)
-	return &rec
+	return rec
 }
 
 // Do invokes a request on the given handler with the given
