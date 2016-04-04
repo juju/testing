@@ -129,7 +129,7 @@ func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, e
 
 type CleanupPatcher interface {
 	PatchEnvironment(name, value string)
-	AddCleanup(cleanup CleanupFunc)
+	AddCleanup(cleanup func(*gc.C))
 }
 
 // PatchExecutableThrowError is needed to test cases in which we expect exit
