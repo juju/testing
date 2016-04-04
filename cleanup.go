@@ -9,15 +9,12 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-type CleanupFunc func(*gc.C)
-type cleanupStack []CleanupFunc
-
 // CleanupSuite adds the ability to add cleanup functions that are called
 // during either test tear down or suite tear down depending on the method
 // called.
 type CleanupSuite struct {
-	testStack    cleanupStack
-	suiteStack   cleanupStack
+	testStack    []func(*gc.C)
+	suiteStack   []func(*gc.C)
 	origSuite    *CleanupSuite
 	testsStarted bool
 	inTest       bool
@@ -50,7 +47,7 @@ func (s *CleanupSuite) TearDownTest(c *gc.C) {
 	s.inTest = false
 }
 
-func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
+func (s *CleanupSuite) callStack(c *gc.C, stack []func(*gc.C)) {
 	for i := len(stack) - 1; i >= 0; i-- {
 		stack[i](c)
 	}
@@ -59,7 +56,7 @@ func (s *CleanupSuite) callStack(c *gc.C, stack cleanupStack) {
 // AddCleanup pushes the cleanup function onto the stack of functions to be
 // called during TearDownTest or TearDownSuite. TearDownTest will be used if
 // SetUpTest has already been called, else we will use TearDownSuite
-func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
+func (s *CleanupSuite) AddCleanup(cleanup func(*gc.C)) {
 	if s.origSuite == nil {
 		// This is either called before SetUpSuite or after
 		// TearDownSuite. Either way, we can't really trust that we're
@@ -101,13 +98,6 @@ func (s *CleanupSuite) AddCleanup(cleanup CleanupFunc) {
 		return
 	}
 	s.testStack = append(s.testStack, cleanup)
-}
-
-// AddSuiteCleanup is deprecated. Just call AddCleanup and it will use the
-// right lifetime for when to call the cleanup based on whether we are in a
-// Test right now or not.
-func (s *CleanupSuite) AddSuiteCleanup(cleanup CleanupFunc) {
-	s.AddCleanup(cleanup)
 }
 
 // PatchEnvironment sets the environment variable 'name' the the value passed
