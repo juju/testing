@@ -14,8 +14,9 @@ import (
 	"strings"
 
 	"github.com/juju/utils"
-
 	gc "gopkg.in/check.v1"
+
+	jc "github.com/juju/testing/checkers"
 )
 
 var HookChannelSize = 10
@@ -127,6 +128,7 @@ func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, e
 	}
 }
 
+// CleanupPatcher represents a value that can patch values for tests.
 type CleanupPatcher interface {
 	PatchEnvironment(name, value string)
 	AddCleanup(cleanup func(*gc.C))
@@ -141,7 +143,7 @@ func PatchExecutableThrowError(c *gc.C, patcher CleanupPatcher, execName string,
 		                       setlocal enabledelayedexpansion
                                echo failing
                                exit /b %d
-                               REM see %ERRORLEVEL% for last exit code like $? on linux
+                               REM see %%ERRORLEVEL%% for last exit code like $? on linux
                                `, exitCode)
 		PatchExecutable(c, patcher, execName, script)
 	default:
@@ -196,4 +198,141 @@ func AssertEchoArgs(c *gc.C, execName string, args ...string) {
 	// Write out the remaining lines for the next check
 	content = []byte(strings.Join(lines[1:], "\n"))
 	err = ioutil.WriteFile(execName+".out", content, 0644) // or just call this filename somewhere, once.
+}
+
+// PatchExecHelper is a type that helps you patch out calls to executables by
+// patching out the exec.Command function that creates the exec.Cmd to call
+// them. This is very similar to PatchExecutable above, except it works on
+// windows exe files, is a lot easier to control stderr and stdout, doesn't
+// require arcane bash and batch scripting, and lets you control both the output
+// *and* test the arguments, all without requiring writing any garbage files to
+// disk.
+//
+// PatchExecHelper *must* be embedded in your test suite in order to function.
+// It adds a test to your testsuite which by default simply does nothing.  When
+// the patched exec.Command function is called (returned by GetExecCommand),
+// instead of running the requested executable, we call the test executable with
+// -check.f to rnu only TestExecSuiteHelperProcess, which acts as a configurable
+// main function.
+type PatchExecHelper struct{}
+
+// PatchExecConfig holds the arguments for PatchExecHelper.GetExecCommand.
+type PatchExecConfig struct {
+	// Stderr is the value you'd like written to stderr.
+	Stderr string
+	// Stdout is the value you'd like written to stdout.
+	Stdout string
+	// ExitCode controls the exit code of the patched executable.
+	ExitCode int
+	// Args is a channel that will be sent the args passed to the patched
+	// execCommand function.  It should be a channel with a buffer equal to the
+	// number of executions you expect to be run (often just 1).  Do not use an
+	// unbuffered channel unless you're reading the channel from another
+	// goroutine, or you will almost certainly block your tests indefinitely.
+	Args chan<- []string
+}
+
+// GetExecCommand returns a function that can be used to patch out a use of
+// exec.Command. See PatchExecConfig for details about the arguments.
+func (PatchExecHelper) GetExecCommand(cfg PatchExecConfig) func(string, ...string) *exec.Cmd {
+	// This method doesn't technically need to be a method on PatchExecHelper,
+	// but serves as a reminder to embed PatchExecHelper.
+	return func(command string, args ...string) *exec.Cmd {
+		// We redirect the command to call the test executable, telling it to
+		// run the TestExecSuiteHelperProcess test that got embedded into the
+		// test suite, and pass the original args at the end of our args.
+		//
+		// Note that we don't need to include the suite name in check.f, because
+		// even if you have more than one suite embedding PatchExecHelper, all
+		// the tests have the same imlpementation, and the first instance of the
+		// test to run calls os.Exit, and therefore none of the other tests will
+		// run.
+		cs := []string{"-check.f=TestExecSuiteHelperProcess", "--", command}
+		cs = append(cs, args...)
+		cmd := exec.Command(os.Args[0], cs...)
+
+		env := []string{
+			"JUJU_WANT_HELPER_PROCESS=1",
+			"JUJU_HELPER_PROCESS_STDERR=" + cfg.Stderr,
+			"JUJU_HELPER_PROCESS_STDOUT=" + cfg.Stdout,
+			fmt.Sprintf("JUJU_HELPER_PROCESS_EXITCODE=%d", cfg.ExitCode),
+		}
+
+		cmd.Env = env
+
+		// Pass the args back on the arg channel. This is why the channel needs
+		// to be buffered, so this won't block.
+		if cfg.Args != nil {
+			cfg.Args <- append([]string{command}, args...)
+		}
+		return cmd
+	}
+}
+
+// TestExecSuiteHelperProcess is a fake test which is added to your test suite
+// (because you remembered to embed PatchExecHelper in your suite, right?). It
+// allows us to use the test executable as a helper process to get expected
+// output for tests.  When run normally during tests, this test simply does
+// nothing (and passes).  The above patched exec.Command runs the test
+// executable with -check.f, it runs this test and enables the configurable
+// behavior.  Because the test exits with os.Exit, no additional test output is
+// written.
+func (PatchExecHelper) TestExecSuiteHelperProcess(c *gc.C) {
+	if os.Getenv("JUJU_WANT_HELPER_PROCESS") == "" {
+		return
+	}
+	if stderr := os.Getenv("JUJU_HELPER_PROCESS_STDERR"); stderr != "" {
+		fmt.Fprintln(os.Stderr, stderr)
+	}
+	if stdout := os.Getenv("JUJU_HELPER_PROCESS_STDOUT"); stdout != "" {
+		fmt.Fprintln(os.Stdout, stdout)
+	}
+	code := os.Getenv("JUJU_HELPER_PROCESS_EXITCODE")
+	if code == "" {
+		os.Exit(0)
+	}
+	exit, err := strconv.Atoi(code)
+	if err != nil {
+		// This should be impossible, since we set this with an int above.
+		panic(err)
+	}
+	os.Exit(exit)
+
+}
+
+// CaptureOutput runs the given function and captures anything written
+// to Stderr or Stdout during f's execution.
+func CaptureOutput(c *gc.C, f func()) (stdout []byte, stderr []byte) {
+	dir := c.MkDir()
+	stderrf, err := os.OpenFile(filepath.Join(dir, "stderr"), os.O_RDWR|os.O_CREATE, 0600)
+	c.Assert(err, jc.ErrorIsNil)
+	defer stderrf.Close()
+
+	stdoutf, err := os.OpenFile(filepath.Join(dir, "stdout"), os.O_RDWR|os.O_CREATE, 0600)
+	c.Assert(err, jc.ErrorIsNil)
+	defer stdoutf.Close()
+
+	// make a sub-functions so those defers go off ASAP.
+	func() {
+		origErr := os.Stderr
+		defer func() { os.Stderr = origErr }()
+		origOut := os.Stdout
+		defer func() { os.Stdout = origOut }()
+		os.Stderr = stderrf
+		os.Stdout = stdoutf
+
+		f()
+	}()
+
+	_, err = stderrf.Seek(0, 0)
+	c.Assert(err, jc.ErrorIsNil)
+	stderr, err = ioutil.ReadAll(stderrf)
+	c.Assert(err, jc.ErrorIsNil)
+
+	_, err = stdoutf.Seek(0, 0)
+	c.Assert(err, jc.ErrorIsNil)
+	stdout, err = ioutil.ReadAll(stdoutf)
+	c.Assert(err, jc.ErrorIsNil)
+
+	return stdout, stderr
 }

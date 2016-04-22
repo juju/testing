@@ -4,6 +4,9 @@
 package testing_test
 
 import (
+	"bytes"
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -70,9 +73,92 @@ func (s *cmdSuite) TestPatchExecutableThrowError(c *gc.C) {
 	c.Assert(output, gc.Equals, "failing")
 }
 
+func (s *cmdSuite) TestCaptureOutput(c *gc.C) {
+	f := func() {
+		_, err := fmt.Fprint(os.Stderr, "this is stderr")
+		c.Assert(err, jc.ErrorIsNil)
+		_, err = fmt.Fprint(os.Stdout, "this is stdout")
+		c.Assert(err, jc.ErrorIsNil)
+	}
+	stdout, stderr := testing.CaptureOutput(c, f)
+	c.Check(string(stdout), gc.Equals, "this is stdout")
+	c.Check(string(stderr), gc.Equals, "this is stderr")
+}
+
+var _ = gc.Suite(&ExecHelperSuite{})
+
+type ExecHelperSuite struct {
+	testing.PatchExecHelper
+}
+
+func (s *ExecHelperSuite) TestExecHelperError(c *gc.C) {
+	argChan := make(chan []string, 1)
+
+	cfg := testing.PatchExecConfig{
+		Stdout:   "Hellooooo stdout!",
+		Stderr:   "Hellooooo stderr!",
+		ExitCode: 55,
+		Args:     argChan,
+	}
+
+	f := s.GetExecCommand(cfg)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	cmd := f("echo", "hello world!")
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	err := cmd.Run()
+	c.Assert(err, gc.NotNil)
+	_, ok := err.(*exec.ExitError)
+	if !ok {
+		c.Errorf("Expected *exec.ExitError, but got %T", err)
+	} else {
+		c.Check(err.Error(), gc.Equals, "exit status 55")
+	}
+	c.Check(stderr.String(), gc.Equals, cfg.Stderr+"\n")
+	c.Check(stdout.String(), gc.Equals, cfg.Stdout+"\n")
+
+	select {
+	case args := <-argChan:
+		c.Assert(args, gc.DeepEquals, []string{"echo", "hello world!"})
+	default:
+		c.Fatalf("No arguments passed to output channel")
+	}
+}
+
+func (s *ExecHelperSuite) TestExecHelper(c *gc.C) {
+	argChan := make(chan []string, 1)
+
+	cfg := testing.PatchExecConfig{
+		Stdout: "Hellooooo stdout!",
+		Stderr: "Hellooooo stderr!",
+		Args:   argChan,
+	}
+
+	f := s.GetExecCommand(cfg)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	cmd := f("echo", "hello world!")
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	err := cmd.Run()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Check(stderr.String(), gc.Equals, cfg.Stderr+"\n")
+	c.Check(stdout.String(), gc.Equals, cfg.Stdout+"\n")
+
+	select {
+	case args := <-argChan:
+		c.Assert(args, gc.DeepEquals, []string{"echo", "hello world!"})
+	default:
+		c.Fatalf("No arguments passed to output channel")
+	}
+}
+
 func runCommand(c *gc.C, command string, args ...string) string {
 	cmd := exec.Command(command, args...)
 	out, err := cmd.CombinedOutput()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, jc.ErrorIsNil)
 	return string(out)
 }
