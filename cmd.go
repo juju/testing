@@ -251,14 +251,16 @@ func (PatchExecHelper) GetExecCommand(cfg PatchExecConfig) func(string, ...strin
 		cs = append(cs, args...)
 		cmd := exec.Command(os.Args[0], cs...)
 
-		env := []string{
+		cmd.Env = append(
+			// We must preserve os.Environ() on Windows,
+			// or the subprocess will fail in weird and
+			// wonderful ways.
+			os.Environ(),
 			"JUJU_WANT_HELPER_PROCESS=1",
-			"JUJU_HELPER_PROCESS_STDERR=" + cfg.Stderr,
-			"JUJU_HELPER_PROCESS_STDOUT=" + cfg.Stdout,
+			"JUJU_HELPER_PROCESS_STDERR="+cfg.Stderr,
+			"JUJU_HELPER_PROCESS_STDOUT="+cfg.Stdout,
 			fmt.Sprintf("JUJU_HELPER_PROCESS_EXITCODE=%d", cfg.ExitCode),
-		}
-
-		cmd.Env = env
+		)
 
 		// Pass the args back on the arg channel. This is why the channel needs
 		// to be buffered, so this won't block.
