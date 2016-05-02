@@ -30,7 +30,8 @@ func (s *fakeHomeSuite) SetUpSuite(c *gc.C) {
 
 func (s *fakeHomeSuite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
-	utils.SetHome("/tmp/tests")
+	err := utils.SetHome("/tmp/tests")
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 func (s *fakeHomeSuite) TearDownSuite(c *gc.C) {
