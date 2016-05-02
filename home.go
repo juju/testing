@@ -10,6 +10,8 @@ import (
 
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
+
+	jc "github.com/juju/testing/checkers"
 )
 
 type TestFile struct {
@@ -25,10 +27,11 @@ type FakeHome struct {
 
 func MakeFakeHome(c *gc.C) *FakeHome {
 	fakeHome := c.MkDir()
-	utils.SetHome(fakeHome)
+	err := utils.SetHome(fakeHome)
+	c.Assert(err, jc.ErrorIsNil)
 
 	sshPath := filepath.Join(fakeHome, ".ssh")
-	err := os.Mkdir(sshPath, 0777)
+	err = os.Mkdir(sshPath, 0777)
 	c.Assert(err, gc.IsNil)
 	err = ioutil.WriteFile(filepath.Join(sshPath, "id_rsa"), []byte("private auth key\n"), 0600)
 	c.Assert(err, gc.IsNil)
@@ -114,7 +117,8 @@ func (s *FakeHomeSuite) SetUpTest(c *gc.C) {
 	home := utils.Home()
 	s.Home = MakeFakeHome(c)
 	s.AddCleanup(func(*gc.C) {
-		utils.SetHome(home)
+		err := utils.SetHome(home)
+		c.Assert(err, jc.ErrorIsNil)
 	})
 }
 
