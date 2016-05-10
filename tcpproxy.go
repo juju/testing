@@ -81,6 +81,16 @@ func (p *TCPProxy) Close() error {
 	return nil
 }
 
+// CloseConns closes all the connections that are
+// currently active. The proxy itself remains active.
+func (p *TCPProxy) CloseConns() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, c := range p.conns {
+		c.Close()
+	}
+}
+
 // Addr returns the TCP address of the proxy. Dialing
 // this address will cause a connection to be made
 // to the remote address; any data written will be
@@ -91,6 +101,7 @@ func (p *TCPProxy) Addr() string {
 	// than the wildcard address.
 	return p.listener.Addr().String()
 }
+
 func (p *TCPProxy) isClosed() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
