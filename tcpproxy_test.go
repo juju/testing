@@ -33,20 +33,13 @@ func (*tcpProxySuite) TestTCPProxy(c *gc.C) {
 	conn, err := net.Dial("tcp", p.Addr())
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
-	txt := "hello, world\n"
-	fmt.Fprint(conn, txt)
 
-	buf := make([]byte, len(txt))
-	n, err := io.ReadFull(conn, buf)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(buf[0:n]), gc.Equals, txt)
+	assertEcho(c, conn)
 
 	// Close the connection and check that we see
 	// the connection closed for read.
 	conn.(*net.TCPConn).CloseWrite()
-	n, err = conn.Read(buf)
-	c.Assert(err, gc.Equals, io.EOF)
-	c.Assert(n, gc.Equals, 0)
+	assertEOF(c, conn)
 
 	// Make another connection and close the proxy,
 	// which should close down the proxy and cause us
@@ -56,12 +49,56 @@ func (*tcpProxySuite) TestTCPProxy(c *gc.C) {
 	defer conn.Close()
 
 	p.Close()
-	_, err = conn.Read(buf)
-	c.Assert(err, gc.Equals, io.EOF)
+	assertEOF(c, conn)
 
 	// Make sure that we cannot dial the proxy address either.
 	conn, err = net.Dial("tcp", p.Addr())
 	c.Assert(err, gc.ErrorMatches, ".*connection refused")
+
+	listener.Close()
+	// Make sure that all our connections have gone away too.
+	wg.Wait()
+}
+
+func (*tcpProxySuite) TestCloseConns(c *gc.C) {
+	var wg sync.WaitGroup
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	c.Assert(err, gc.IsNil)
+	defer listener.Close()
+	wg.Add(1)
+	go tcpEcho(&wg, listener)
+
+	p := testing.NewTCPProxy(c, listener.Addr().String())
+	c.Assert(p.Addr(), gc.Not(gc.Equals), listener.Addr().String())
+
+	// Make a couple of connections through the proxy
+	// and test that they work.
+	conn1, err := net.Dial("tcp", p.Addr())
+	c.Assert(err, gc.IsNil)
+	defer conn1.Close()
+	assertEcho(c, conn1)
+
+	conn2, err := net.Dial("tcp", p.Addr())
+	c.Assert(err, gc.IsNil)
+	defer conn1.Close()
+	assertEcho(c, conn1)
+
+	p.CloseConns()
+
+	// Assert that both the connections have been broken.
+	assertEOF(c, conn1)
+	assertEOF(c, conn2)
+
+	// Check that we can still make a connection.
+	conn3, err := net.Dial("tcp", p.Addr())
+	c.Assert(err, gc.IsNil)
+	defer conn3.Close()
+	assertEcho(c, conn3)
+
+	// Close the proxy and check that the last connection goes.
+	p.Close()
+	assertEOF(c, conn3)
 
 	listener.Close()
 	// Make sure that all our connections have gone away too.
@@ -86,4 +123,20 @@ func tcpEcho(wg *sync.WaitGroup, listener net.Listener) {
 			io.Copy(conn, conn)
 		}()
 	}
+}
+
+func assertEcho(c *gc.C, conn net.Conn) {
+	txt := "hello, world\n"
+	fmt.Fprint(conn, txt)
+
+	buf := make([]byte, len(txt))
+	n, err := io.ReadFull(conn, buf)
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(buf[0:n]), gc.Equals, txt)
+}
+
+func assertEOF(c *gc.C, r io.Reader) {
+	n, err := r.Read(make([]byte, 1))
+	c.Assert(err, gc.Equals, io.EOF)
+	c.Assert(n, gc.Equals, 0)
 }
