@@ -30,6 +30,7 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var (
@@ -357,12 +358,19 @@ func MgoTestPackage(t *testing.T, certs *Certs) {
 }
 
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
+	c.Logf("Setting up mgosuite")
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
 	mgo.SetStats(true)
 	// Make tests that use password authentication faster.
 	utils.FastInsecureHash = true
+	mgo.ResetStats()
+	var err error
+	c.Logf("mgo.SetupSuite - %#v", MgoServer)
+	s.Session, err = MgoServer.Dial()
+	c.Assert(err, jc.ErrorIsNil)
+	dropAll(s.Session)
 }
 
 // readUntilMatching reads lines from the given reader until the reader
@@ -408,6 +416,20 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 }
 
 func (s *MgoSuite) TearDownSuite(c *gc.C) {
+	err := MgoServer.Reset()
+	c.Assert(err, jc.ErrorIsNil)
+	s.Session.Close()
+	for i := 0; ; i++ {
+		stats := mgo.GetStats()
+		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
+			break
+		}
+		if i == 20 {
+			c.Fatal("Test left sockets in a dirty state")
+		}
+		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
+		time.Sleep(500 * time.Millisecond)
+	}
 	utils.FastInsecureHash = false
 }
 
@@ -473,12 +495,36 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 	return &mgo.DialInfo{Addrs: addrs, Dial: dial, Timeout: mgoDialTimeout}
 }
 
+func clearDatabases(session *mgo.Session) error {
+	databases, err := session.DatabaseNames()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	for _, name := range databases {
+		err = clearCollections(session.DB(name))
+		if err != nil {
+			return errors.Trace(err)
+		}
+	}
+	return nil
+}
+
+func clearCollections(db *mgo.Database) error {
+	collectionNames, err := db.CollectionNames()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	for _, name := range collectionNames {
+		collection := db.C(name)
+		_, err = collection.RemoveAll(bson.M{})
+		if err != nil {
+			return errors.Trace(err)
+		}
+	}
+	return nil
+}
+
 func (s *MgoSuite) SetUpTest(c *gc.C) {
-	mgo.ResetStats()
-	var err error
-	s.Session, err = MgoServer.Dial()
-	c.Assert(err, jc.ErrorIsNil)
-	dropAll(s.Session)
 }
 
 // Reset deletes all content from the MongoDB server.
@@ -596,20 +642,7 @@ func isUnauthorized(err error) bool {
 }
 
 func (s *MgoSuite) TearDownTest(c *gc.C) {
-	err := MgoServer.Reset()
-	c.Assert(err, jc.ErrorIsNil)
-	s.Session.Close()
-	for i := 0; ; i++ {
-		stats := mgo.GetStats()
-		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
-			break
-		}
-		if i == 20 {
-			c.Fatal("Test left sockets in a dirty state")
-		}
-		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
-		time.Sleep(500 * time.Millisecond)
-	}
+	clearDatabases(s.Session)
 }
 
 // FindTCPPort finds an unused TCP port and returns it.
