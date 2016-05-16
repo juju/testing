@@ -501,6 +501,7 @@ func clearDatabases(session *mgo.Session) error {
 		return errors.Trace(err)
 	}
 	for _, name := range databases {
+		logger.Debugf("clearing database: %v", name)
 		err = clearCollections(session.DB(name))
 		if err != nil {
 			return errors.Trace(err)
@@ -515,6 +516,10 @@ func clearCollections(db *mgo.Database) error {
 		return errors.Trace(err)
 	}
 	for _, name := range collectionNames {
+		if strings.HasPrefix(name, "txns") {
+			continue
+		}
+		logger.Debugf("    clearing collection: %v", name)
 		collection := db.C(name)
 		_, err = collection.RemoveAll(bson.M{})
 		if err != nil {
