@@ -671,7 +671,14 @@ func isUnauthorized(err error) bool {
 }
 
 func (s *MgoSuite) TearDownTest(c *gc.C) {
-	clearDatabases(s.Session)
+	err := s.Session.Ping()
+	if err != nil {
+		s.Session.Close()
+		s.Session, err = MgoServer.Dial()
+		c.Assert(err, jc.ErrorIsNil)
+	}
+	err = clearDatabases(s.Session)
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 // FindTCPPort finds an unused TCP port and returns it.
