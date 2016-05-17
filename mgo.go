@@ -47,6 +47,10 @@ const (
 	maxStartMongodAttempts = 5
 	// The default password to use when connecting to the mongo database.
 	DefaultMongoPassword = "conn-from-name-secret"
+	// When we recreate capped collections after dropping them we have
+	// to guess an appropriate size because there doesn't seem to be a
+	// way to get the original size.
+	recreateCappedSize = 1000000
 )
 
 // Certs holds the certificates and keys required to make a secure
@@ -522,11 +526,31 @@ func clearCollections(db *mgo.Database) error {
 		logger.Debugf("    clearing collection: %v", name)
 		collection := db.C(name)
 		_, err = collection.RemoveAll(bson.M{})
-		if err != nil {
+		if err != nil && strings.HasPrefix(err.Error(), "cannot remove from a capped collection:") {
+			// Ugh - there's no other way to detect capped collections that I can find.
+			err := clearCappedCollection(collection)
+			if err != nil {
+				return errors.Trace(err)
+			}
+		} else if err != nil {
 			return errors.Trace(err)
 		}
 	}
 	return nil
+}
+
+func clearCappedCollection(collection *mgo.Collection) error {
+	err := collection.DropCollection()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	// Because we can't get the info used to create the collection
+	// originally, just use a fixed max size. Hopefully no tests rely
+	// on the original size!
+	return collection.Create(&mgo.CollectionInfo{
+		Capped:   true,
+		MaxBytes: recreateCappedSize,
+	})
 }
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
