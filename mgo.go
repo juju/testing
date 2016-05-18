@@ -526,7 +526,7 @@ func clearCollections(db *mgo.Database) error {
 		logger.Debugf("    clearing collection: %v", name)
 		collection := db.C(name)
 		_, err = collection.RemoveAll(bson.M{})
-		if err != nil && strings.HasPrefix(err.Error(), "cannot remove from a capped collection:") {
+		if err != nil && strings.Contains(err.Error(), "remove from a capped collection") {
 			// Ugh - there's no other way to detect capped collections that I can find.
 			err := clearCappedCollection(collection)
 			if err != nil {
