@@ -520,7 +520,7 @@ func clearCollections(db *mgo.Database) error {
 		return errors.Trace(err)
 	}
 	for _, name := range collectionNames {
-		if strings.HasPrefix(name, "txns") {
+		if strings.HasPrefix(name, "system.") {
 			continue
 		}
 		logger.Debugf("    clearing collection: %v", name)
