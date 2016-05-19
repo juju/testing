@@ -495,7 +495,10 @@ func (inst *MgoInstance) Reset() error {
 	}
 	defer session.Close()
 
-	dbnames, ok := resetAdminPasswordAndFetchDBNames(session)
+	dbnames, ok, err := resetAdminPasswordAndFetchDBNames(session)
+	if err != nil {
+		return errors.Trace(err)
+	}
 	if !ok {
 		// We restart it to regain access.  This should only
 		// happen when tests fail.
@@ -543,14 +546,14 @@ func dropAll(session *mgo.Session) (err error) {
 // server is in when Reset is called. If the test has set a custom
 // password, we're out of luck, but if they are using
 // DefaultStatePassword, we can succeed.
-func resetAdminPasswordAndFetchDBNames(session *mgo.Session) ([]string, bool) {
+func resetAdminPasswordAndFetchDBNames(session *mgo.Session) ([]string, bool, error) {
 	// First try with no password
 	dbnames, err := session.DatabaseNames()
 	if err == nil {
-		return dbnames, true
+		return dbnames, true, nil
 	}
 	if !isUnauthorized(err) {
-		panic(err)
+		return nil, false, errors.Trace(err)
 	}
 	// Then try the two most likely passwords in turn.
 	for _, password := range []string{
@@ -559,22 +562,22 @@ func resetAdminPasswordAndFetchDBNames(session *mgo.Session) ([]string, bool) {
 	} {
 		admin := session.DB("admin")
 		if err := admin.Login("admin", password); err != nil {
-			logger.Infof("failed to log in with password %q", password)
+			logger.Errorf("failed to log in with password %q", password)
 			continue
 		}
 		dbnames, err := session.DatabaseNames()
 		if err == nil {
 			if err := admin.RemoveUser("admin"); err != nil {
-				panic(err)
+				return nil, false, errors.Trace(err)
 			}
-			return dbnames, true
+			return dbnames, true, nil
 		}
 		if !isUnauthorized(err) {
-			panic(err)
+			return nil, false, errors.Trace(err)
 		}
 		logger.Infof("unauthorized access when getting database names; password %q", password)
 	}
-	return nil, false
+	return nil, false, errors.Trace(err)
 }
 
 // isUnauthorized is a copy of the same function in state/open.go.
