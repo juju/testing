@@ -551,11 +551,9 @@ func (s *MgoSuite) SetUpTest(c *gc.C) {
 
 // Reset deletes all content from the MongoDB server.
 func (inst *MgoInstance) Reset() error {
-	// If the server has already been destroyed for testing purposes,
-	// just start it again.
-	if inst.Addr() == "" {
-		err := inst.Start(inst.certs)
-		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
+	err := inst.EnsureRunning()
+	if err != nil {
+		return errors.Trace(err)
 	}
 	session, err := inst.Dial()
 	if err != nil {
@@ -663,8 +661,20 @@ func isUnauthorized(err error) bool {
 	return false
 }
 
+func (inst *MgoInstance) EnsureRunning() error {
+	// If the server has already been destroyed for testing purposes,
+	// just start it again.
+	if inst.Addr() == "" {
+		err := inst.Start(inst.certs)
+		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
+	}
+	return nil
+}
+
 func (s *MgoSuite) TearDownTest(c *gc.C) {
-	err := s.Session.Ping()
+	err := MgoServer.EnsureRunning()
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.Session.Ping()
 	if err != nil {
 		// The test has killed the server - reconnect.
 		s.Session.Close()
