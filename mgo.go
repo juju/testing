@@ -415,7 +415,9 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 func (s *MgoSuite) TearDownSuite(c *gc.C) {
 	err := MgoServer.Reset()
 	c.Assert(err, jc.ErrorIsNil)
-	s.Session.Close()
+	if s.Session != nil {
+		s.Session.Close()
+	}
 	for i := 0; ; i++ {
 		stats := mgo.GetStats()
 		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
