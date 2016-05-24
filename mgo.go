@@ -665,6 +665,7 @@ func isUnauthorized(err error) bool {
 func (s *MgoSuite) TearDownTest(c *gc.C) {
 	err := s.Session.Ping()
 	if err != nil {
+		// The test has killed the server - reconnect.
 		s.Session.Close()
 		s.Session, err = MgoServer.Dial()
 		c.Assert(err, jc.ErrorIsNil)
