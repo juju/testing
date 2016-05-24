@@ -89,9 +89,6 @@ type MgoInstance struct {
 	// the mongod application
 	Params []string
 
-	// EnableJournal enables journaling.
-	EnableJournal bool
-
 	// EnableAuth enables authentication/authorization.
 	EnableAuth bool
 
@@ -221,9 +218,6 @@ func (inst *MgoInstance) run() error {
 			"--auth",
 			"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		)
-	}
-	if !inst.EnableJournal {
-		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
