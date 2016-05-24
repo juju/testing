@@ -356,7 +356,6 @@ func MgoTestPackage(t *testing.T, certs *Certs) {
 }
 
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
-	c.Logf("Setting up mgosuite")
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
