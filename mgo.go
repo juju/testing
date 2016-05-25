@@ -47,10 +47,6 @@ const (
 	maxStartMongodAttempts = 5
 	// The default password to use when connecting to the mongo database.
 	DefaultMongoPassword = "conn-from-name-secret"
-	// When we recreate capped collections after dropping them we have
-	// to guess an appropriate size because there doesn't seem to be a
-	// way to get the original size.
-	recreateCappedSize = 1000000
 )
 
 // Certs holds the certificates and keys required to make a secure
@@ -209,6 +205,7 @@ func (inst *MgoInstance) run() error {
 		"--nohttpinterface",
 		"--oplogSize", "10",
 		"--ipv6",
+		"--setParameter", "enableTestCommands=1",
 	}
 	if runtime.GOOS != "windows" {
 		mgoargs = append(mgoargs, "--nounixsocket")
@@ -533,17 +530,9 @@ func clearCollections(db *mgo.Database) error {
 }
 
 func clearCappedCollection(collection *mgo.Collection) error {
-	err := collection.DropCollection()
-	if err != nil {
-		return errors.Trace(err)
-	}
-	// Because we can't get the info used to create the collection
-	// originally, just use a fixed max size. Hopefully no tests rely
-	// on the original size!
-	return collection.Create(&mgo.CollectionInfo{
-		Capped:   true,
-		MaxBytes: recreateCappedSize,
-	})
+	// This is a test command - relies on the enableTestCommands
+	// setting being passed to mongo at startup.
+	return collection.Database.Run(bson.D{{"emptycapped", collection.Name}}, nil)
 }
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
