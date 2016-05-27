@@ -502,18 +502,42 @@ func clearCollections(db *mgo.Database) error {
 			continue
 		}
 		collection := db.C(name)
-		_, err = collection.RemoveAll(bson.M{})
-		if err != nil && strings.Contains(err.Error(), "remove from a capped collection") {
-			// Ugh - there's no other way to detect capped collections that I can find.
-			err := clearCappedCollection(collection)
-			if err != nil {
-				return errors.Trace(err)
-			}
-		} else if err != nil {
+		clearFunc := clearNormalCollection
+		capped, err := isCapped(collection)
+		if err != nil {
+			return errors.Trace(err)
+		}
+		if capped {
+			clearFunc = clearCappedCollection
+		}
+		err = clearFunc(collection)
+		if err != nil {
 			return errors.Trace(err)
 		}
 	}
 	return nil
+}
+
+func isCapped(collection *mgo.Collection) (bool, error) {
+	result := bson.M{}
+	err := collection.Database.Run(bson.D{{"collstats", collection.Name}}, &result)
+	if err != nil {
+		return false, errors.Trace(err)
+	}
+	value, found := result["capped"]
+	if !found {
+		return false, nil
+	}
+	capped, ok := value.(bool)
+	if !ok {
+		return false, errors.Errorf("unexpected type for capped: %v", value)
+	}
+	return capped, nil
+}
+
+func clearNormalCollection(collection *mgo.Collection) error {
+	_, err := collection.RemoveAll(bson.M{})
+	return err
 }
 
 func clearCappedCollection(collection *mgo.Collection) error {
