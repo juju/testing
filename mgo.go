@@ -362,9 +362,10 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	mgo.ResetStats()
 	var err error
 	c.Logf("mgo.SetupSuite - %#v", MgoServer)
-	s.Session, err = MgoServer.Dial()
+	session, err := MgoServer.Dial()
 	c.Assert(err, jc.ErrorIsNil)
-	dropAll(s.Session)
+	dropAll(session)
+	session.Close()
 }
 
 // readUntilMatching reads lines from the given reader until the reader
@@ -412,20 +413,6 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 func (s *MgoSuite) TearDownSuite(c *gc.C) {
 	err := MgoServer.Reset()
 	c.Assert(err, jc.ErrorIsNil)
-	if s.Session != nil {
-		s.Session.Close()
-	}
-	for i := 0; ; i++ {
-		stats := mgo.GetStats()
-		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
-			break
-		}
-		if i == 20 {
-			c.Fatal("Test left sockets in a dirty state")
-		}
-		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
-		time.Sleep(500 * time.Millisecond)
-	}
 	utils.FastInsecureHash = false
 }
 
@@ -536,6 +523,11 @@ func clearCappedCollection(collection *mgo.Collection) error {
 }
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
+	mgo.ResetStats()
+	var err error
+	c.Logf("mgo.SetupTest - %#v", MgoServer)
+	s.Session, err = MgoServer.Dial()
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 // Reset deletes all content from the MongoDB server.
@@ -663,6 +655,7 @@ func (inst *MgoInstance) EnsureRunning() error {
 func (s *MgoSuite) TearDownTest(c *gc.C) {
 	err := MgoServer.EnsureRunning()
 	c.Assert(err, jc.ErrorIsNil)
+
 	err = s.Session.Ping()
 	if err != nil {
 		// The test has killed the server - reconnect.
@@ -670,8 +663,24 @@ func (s *MgoSuite) TearDownTest(c *gc.C) {
 		s.Session, err = MgoServer.Dial()
 		c.Assert(err, jc.ErrorIsNil)
 	}
+
+	// Rather than dropping the databases (which is very slow in Mongo
+	// 3.2) we clear all of the collections.
 	err = clearDatabases(s.Session)
 	c.Assert(err, jc.ErrorIsNil)
+	s.Session.Close()
+
+	for i := 0; ; i++ {
+		stats := mgo.GetStats()
+		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
+			break
+		}
+		if i == 20 {
+			c.Fatal("Test left sockets in a dirty state")
+		}
+		c.Logf("Waiting for sockets to die: %d in use, %d alive", stats.SocketsInUse, stats.SocketsAlive)
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 // FindTCPPort finds an unused TCP port and returns it.
