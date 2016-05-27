@@ -360,8 +360,6 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	// Make tests that use password authentication faster.
 	utils.FastInsecureHash = true
 	mgo.ResetStats()
-	var err error
-	c.Logf("mgo.SetupSuite - %#v", MgoServer)
 	session, err := MgoServer.Dial()
 	c.Assert(err, jc.ErrorIsNil)
 	dropAll(session)
@@ -549,7 +547,6 @@ func clearCappedCollection(collection *mgo.Collection) error {
 func (s *MgoSuite) SetUpTest(c *gc.C) {
 	mgo.ResetStats()
 	var err error
-	c.Logf("mgo.SetupTest - %#v", MgoServer)
 	s.Session, err = MgoServer.Dial()
 	c.Assert(err, jc.ErrorIsNil)
 }
