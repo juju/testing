@@ -32,6 +32,7 @@ func (s *CleanupSuite) SetUpSuite(c *gc.C) {
 
 func (s *CleanupSuite) TearDownSuite(c *gc.C) {
 	s.callStack(c, s.suiteStack)
+	s.suiteStack = nil
 	s.origSuite = nil
 	s.tornDown = true
 }
@@ -44,6 +45,7 @@ func (s *CleanupSuite) SetUpTest(c *gc.C) {
 
 func (s *CleanupSuite) TearDownTest(c *gc.C) {
 	s.callStack(c, s.testStack)
+	s.testStack = nil
 	s.inTest = false
 }
 

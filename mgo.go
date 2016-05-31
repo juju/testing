@@ -30,6 +30,7 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var (
@@ -83,9 +84,6 @@ type MgoInstance struct {
 	// Params is a list of additional parameters that will be passed to
 	// the mongod application
 	Params []string
-
-	// EnableJournal enables journaling.
-	EnableJournal bool
 
 	// EnableAuth enables authentication/authorization.
 	EnableAuth bool
@@ -207,6 +205,7 @@ func (inst *MgoInstance) run() error {
 		"--nohttpinterface",
 		"--oplogSize", "10",
 		"--ipv6",
+		"--setParameter", "enableTestCommands=1",
 	}
 	if runtime.GOOS != "windows" {
 		mgoargs = append(mgoargs, "--nounixsocket")
@@ -216,9 +215,6 @@ func (inst *MgoInstance) run() error {
 			"--auth",
 			"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		)
-	}
-	if !inst.EnableJournal {
-		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
@@ -363,6 +359,11 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	mgo.SetStats(true)
 	// Make tests that use password authentication faster.
 	utils.FastInsecureHash = true
+	mgo.ResetStats()
+	session, err := MgoServer.Dial()
+	c.Assert(err, jc.ErrorIsNil)
+	dropAll(session)
+	session.Close()
 }
 
 // readUntilMatching reads lines from the given reader until the reader
@@ -408,6 +409,8 @@ func readLastLines(prefix string, r io.Reader, n int) []string {
 }
 
 func (s *MgoSuite) TearDownSuite(c *gc.C) {
+	err := MgoServer.Reset()
+	c.Assert(err, jc.ErrorIsNil)
 	utils.FastInsecureHash = false
 }
 
@@ -473,21 +476,86 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 	return &mgo.DialInfo{Addrs: addrs, Dial: dial, Timeout: mgoDialTimeout}
 }
 
+func clearDatabases(session *mgo.Session) error {
+	databases, err := session.DatabaseNames()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	for _, name := range databases {
+		err = clearCollections(session.DB(name))
+		if err != nil {
+			return errors.Trace(err)
+		}
+	}
+	return nil
+}
+
+func clearCollections(db *mgo.Database) error {
+	collectionNames, err := db.CollectionNames()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	for _, name := range collectionNames {
+		if strings.HasPrefix(name, "system.") {
+			continue
+		}
+		collection := db.C(name)
+		clearFunc := clearNormalCollection
+		capped, err := isCapped(collection)
+		if err != nil {
+			return errors.Trace(err)
+		}
+		if capped {
+			clearFunc = clearCappedCollection
+		}
+		err = clearFunc(collection)
+		if err != nil {
+			return errors.Trace(err)
+		}
+	}
+	return nil
+}
+
+func isCapped(collection *mgo.Collection) (bool, error) {
+	result := bson.M{}
+	err := collection.Database.Run(bson.D{{"collstats", collection.Name}}, &result)
+	if err != nil {
+		return false, errors.Trace(err)
+	}
+	value, found := result["capped"]
+	if !found {
+		return false, nil
+	}
+	capped, ok := value.(bool)
+	if !ok {
+		return false, errors.Errorf("unexpected type for capped: %v", value)
+	}
+	return capped, nil
+}
+
+func clearNormalCollection(collection *mgo.Collection) error {
+	_, err := collection.RemoveAll(bson.M{})
+	return err
+}
+
+func clearCappedCollection(collection *mgo.Collection) error {
+	// This is a test command - relies on the enableTestCommands
+	// setting being passed to mongo at startup.
+	return collection.Database.Run(bson.D{{"emptycapped", collection.Name}}, nil)
+}
+
 func (s *MgoSuite) SetUpTest(c *gc.C) {
 	mgo.ResetStats()
 	var err error
 	s.Session, err = MgoServer.Dial()
 	c.Assert(err, jc.ErrorIsNil)
-	dropAll(s.Session)
 }
 
 // Reset deletes all content from the MongoDB server.
 func (inst *MgoInstance) Reset() error {
-	// If the server has already been destroyed for testing purposes,
-	// just start it again.
-	if inst.Addr() == "" {
-		err := inst.Start(inst.certs)
-		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
+	err := inst.EnsureRunning()
+	if err != nil {
+		return errors.Trace(err)
 	}
 	session, err := inst.Dial()
 	if err != nil {
@@ -598,10 +666,34 @@ func isUnauthorized(err error) bool {
 	return false
 }
 
+func (inst *MgoInstance) EnsureRunning() error {
+	// If the server has already been destroyed for testing purposes,
+	// just start it again.
+	if inst.Addr() == "" {
+		err := inst.Start(inst.certs)
+		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
+	}
+	return nil
+}
+
 func (s *MgoSuite) TearDownTest(c *gc.C) {
-	err := MgoServer.Reset()
+	err := MgoServer.EnsureRunning()
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.Session.Ping()
+	if err != nil {
+		// The test has killed the server - reconnect.
+		s.Session.Close()
+		s.Session, err = MgoServer.Dial()
+		c.Assert(err, jc.ErrorIsNil)
+	}
+
+	// Rather than dropping the databases (which is very slow in Mongo
+	// 3.2) we clear all of the collections.
+	err = clearDatabases(s.Session)
 	c.Assert(err, jc.ErrorIsNil)
 	s.Session.Close()
+
 	for i := 0; ; i++ {
 		stats := mgo.GetStats()
 		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
