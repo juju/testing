@@ -362,8 +362,9 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	mgo.ResetStats()
 	session, err := MgoServer.Dial()
 	c.Assert(err, jc.ErrorIsNil)
-	dropAll(session)
-	session.Close()
+	defer session.Close()
+	err = dropAll(session)
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 // readUntilMatching reads lines from the given reader until the reader
@@ -545,10 +546,11 @@ func clearCappedCollection(collection *mgo.Collection) error {
 }
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
+	s.Session = nil
 	mgo.ResetStats()
-	var err error
-	s.Session, err = MgoServer.Dial()
+	session, err := MgoServer.Dial()
 	c.Assert(err, jc.ErrorIsNil)
+	s.Session = session
 }
 
 // Reset deletes all content from the MongoDB server.
@@ -677,11 +679,14 @@ func (inst *MgoInstance) EnsureRunning() error {
 }
 
 func (s *MgoSuite) TearDownTest(c *gc.C) {
+	if s.Session == nil {
+		c.Fatal("SetUpTest failed")
+	}
+
 	err := MgoServer.EnsureRunning()
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.Session.Ping()
-	if err != nil {
+	if err = s.Session.Ping(); err != nil {
 		// The test has killed the server - reconnect.
 		s.Session.Close()
 		s.Session, err = MgoServer.Dial()
@@ -693,6 +698,7 @@ func (s *MgoSuite) TearDownTest(c *gc.C) {
 	err = clearDatabases(s.Session)
 	c.Assert(err, jc.ErrorIsNil)
 	s.Session.Close()
+	s.Session = nil
 
 	for i := 0; ; i++ {
 		stats := mgo.GetStats()
