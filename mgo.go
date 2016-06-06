@@ -201,6 +201,7 @@ func (inst *MgoInstance) run() error {
 		"--port", mgoport,
 		"--nssize", "1",
 		"--noprealloc",
+		"--nojournal",
 		"--smallfiles",
 		"--nohttpinterface",
 		"--oplogSize", "10",
