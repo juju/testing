@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -40,6 +42,12 @@ var (
 
 	// regular expression to match output of mongod
 	waitingForConnectionsRe = regexp.MustCompile(".*initandlisten.*waiting for connections.*")
+
+	// After version 3.2 we shouldn't use --nojournal - it makes the
+	// WiredTiger storage engine much slower.
+	// https://jira.mongodb.org/browse/SERVER-21198
+	useJournalMongoVersion = version.Number{Major: 3, Minor: 2}
+	mongoVersion           lazyMongoVersion
 )
 
 const (
@@ -222,6 +230,14 @@ func (inst *MgoInstance) run() error {
 			"--sslPEMKeyFile", filepath.Join(inst.dir, "server.pem"),
 			"--sslPEMKeyPassword", "ignored")
 	}
+	version, err := mongoVersion.Get()
+	if err != nil {
+		return err
+	}
+	if version.Compare(useJournalMongoVersion) == -1 {
+		mgoargs = append(mgoargs, "--nojournal")
+	}
+
 	if inst.Params != nil {
 		mgoargs = append(mgoargs, inst.Params...)
 	}
@@ -308,6 +324,51 @@ func getMongod() (string, error) {
 		logger.Debugf("failed to find %q: %v", path, err)
 	}
 	return "", err
+}
+
+// The mongod --version line starts with this prefix.
+const versionLinePrefix = "db version v"
+
+func detectMongoVersion() (version.Number, error) {
+	mongoPath, err := getMongod()
+	if err != nil {
+		return version.Zero, errors.Trace(err)
+	}
+	output, err := exec.Command(mongoPath, "--version").Output()
+	if err != nil {
+		return version.Zero, errors.Trace(err)
+	}
+	parts := strings.SplitN(string(output), "\n", 2)
+	// There's guaranteed to be at least one element, even if output's empty.
+	versionLine := parts[0]
+	if !strings.HasPrefix(versionLine, versionLinePrefix) {
+		return version.Zero, errors.New("couldn't get mongod version - no version line")
+	}
+	ver, err := version.Parse(versionLine[len(versionLinePrefix):])
+	if err != nil {
+		return version.Zero, errors.Trace(err)
+	}
+	logger.Debugf("detected mongod version %v", ver)
+	return ver, nil
+}
+
+// lazyMongoVersion stores the mongod version once we've got it.
+type lazyMongoVersion struct {
+	sync.Mutex
+	version version.Number
+}
+
+func (v *lazyMongoVersion) Get() (version.Number, error) {
+	v.Lock()
+	defer v.Unlock()
+	if v.version == version.Zero {
+		ver, err := detectMongoVersion()
+		if err != nil {
+			return version.Zero, errors.Trace(err)
+		}
+		v.version = ver
+	}
+	return v.version, nil
 }
 
 func (inst *MgoInstance) kill(sig os.Signal) {
