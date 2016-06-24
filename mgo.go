@@ -338,9 +338,16 @@ func detectMongoVersion() (version.Number, error) {
 	if err != nil {
 		return version.Zero, errors.Trace(err)
 	}
-	parts := strings.SplitN(string(output), "\n", 2)
-	// There's guaranteed to be at least one element, even if output's empty.
-	versionLine := parts[0]
+	// Read the first line of the output with a scanner (to handle
+	// newlines in a cross-platform way).
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	versionLine := ""
+	if scanner.Scan() {
+		versionLine = scanner.Text()
+	}
+	if scanner.Err() != nil {
+		return version.Zero, errors.Trace(scanner.Err())
+	}
 	if !strings.HasPrefix(versionLine, versionLinePrefix) {
 		return version.Zero, errors.New("couldn't get mongod version - no version line")
 	}
