@@ -31,7 +31,7 @@ func (s SimpleMessages) GoString() string {
 	return fmt.Sprintf("SimpleMessages{\n%s\n}", strings.Join(out, "\n"))
 }
 
-func logToSimpleMessages(log []loggo.TestLogValues) SimpleMessages {
+func logToSimpleMessages(log []loggo.Entry) SimpleMessages {
 	out := make(SimpleMessages, len(log))
 	for i, val := range log {
 		out[i].Level = val.Level
@@ -47,10 +47,10 @@ type logMatches struct {
 func (checker *logMatches) Check(params []interface{}, _ []string) (result bool, error string) {
 	var obtained SimpleMessages
 	switch params[0].(type) {
-	case []loggo.TestLogValues:
-		obtained = logToSimpleMessages(params[0].([]loggo.TestLogValues))
+	case []loggo.Entry:
+		obtained = logToSimpleMessages(params[0].([]loggo.Entry))
 	default:
-		return false, "Obtained value must be of type []loggo.TestLogValues or SimpleMessage"
+		return false, "Obtained value must be of type []loggo.Entry or SimpleMessage"
 	}
 
 	var expected SimpleMessages

@@ -6,7 +6,7 @@ package testing
 import (
 	"fmt"
 	"os"
-	"time"
+	"path/filepath"
 
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
@@ -27,10 +27,11 @@ var logConfig = func() string {
 	return "DEBUG"
 }()
 
-func (w *gocheckWriter) Write(level loggo.Level, module, filename string, line int, timestamp time.Time, message string) {
+func (w *gocheckWriter) Write(entry loggo.Entry) {
 	// Magic calldepth value...
 	// TODO (frankban) Document why we are using this magic value.
-	w.c.Output(3, fmt.Sprintf("%s %s %s", level, module, message))
+	filename := filepath.Base(entry.Filename)
+	w.c.Output(3, fmt.Sprintf("%s %s %s:%d %s", entry.Level, entry.Module, filename, entry.Line, entry.Message))
 }
 
 func (s *LoggingSuite) SetUpSuite(c *gc.C) {
@@ -38,8 +39,7 @@ func (s *LoggingSuite) SetUpSuite(c *gc.C) {
 }
 
 func (s *LoggingSuite) TearDownSuite(c *gc.C) {
-	loggo.ResetLoggers()
-	loggo.ResetWriters()
+	loggo.ResetLogging()
 }
 
 func (s *LoggingSuite) SetUpTest(c *gc.C) {
@@ -51,17 +51,16 @@ func (s *LoggingSuite) TearDownTest(c *gc.C) {
 
 type discardWriter struct{}
 
-func (discardWriter) Write(level loggo.Level, name, filename string, line int, timestamp time.Time, message string) {
+func (discardWriter) Write(entry loggo.Entry) {
 }
 
 func (s *LoggingSuite) setUp(c *gc.C) {
-	loggo.ResetWriters()
+	loggo.ResetLogging()
 	// Don't use the default writer for the test logging, which
 	// means we can still get logging output from tests that
 	// replace the default writer.
-	loggo.ReplaceDefaultWriter(discardWriter{})
-	loggo.RegisterWriter("loggingsuite", &gocheckWriter{c}, loggo.TRACE)
-	loggo.ResetLoggers()
+	loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
+	loggo.RegisterWriter("loggingsuite", &gocheckWriter{c})
 	err := loggo.ConfigureLoggers(logConfig)
 	c.Assert(err, gc.IsNil)
 }

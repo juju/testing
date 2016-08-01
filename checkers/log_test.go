@@ -43,7 +43,7 @@ type LogMatchesSuite struct{}
 var _ = gc.Suite(&LogMatchesSuite{})
 
 func (s *LogMatchesSuite) TestMatchSimpleMessage(c *gc.C) {
-	log := []loggo.TestLogValues{
+	log := []loggo.Entry{
 		{Level: loggo.INFO, Message: "foo bar"},
 		{Level: loggo.INFO, Message: "12345"},
 	}
@@ -68,7 +68,7 @@ func (s *LogMatchesSuite) TestMatchSimpleMessage(c *gc.C) {
 }
 
 func (s *LogMatchesSuite) TestMatchSimpleMessages(c *gc.C) {
-	log := []loggo.TestLogValues{
+	log := []loggo.Entry{
 		{Level: loggo.INFO, Message: "foo bar"},
 		{Level: loggo.INFO, Message: "12345"},
 	}
@@ -93,7 +93,7 @@ func (s *LogMatchesSuite) TestMatchSimpleMessages(c *gc.C) {
 }
 
 func (s *LogMatchesSuite) TestMatchStrings(c *gc.C) {
-	log := []loggo.TestLogValues{
+	log := []loggo.Entry{
 		{Level: loggo.INFO, Message: "foo bar"},
 		{Level: loggo.INFO, Message: "12345"},
 	}
@@ -103,7 +103,7 @@ func (s *LogMatchesSuite) TestMatchStrings(c *gc.C) {
 }
 
 func (s *LogMatchesSuite) TestMatchInexact(c *gc.C) {
-	log := []loggo.TestLogValues{
+	log := []loggo.Entry{
 		{Level: loggo.INFO, Message: "foo bar"},
 		{Level: loggo.INFO, Message: "baz"},
 		{Level: loggo.DEBUG, Message: "12345"},
@@ -169,11 +169,11 @@ func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsSliceTestLogValues(c *gc.C) {
 	expected := jc.SimpleMessages{}
 	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil)
 	c.Assert(result, gc.Equals, false)
-	c.Assert(err, gc.Equals, "Obtained value must be of type []loggo.TestLogValues or SimpleMessage")
+	c.Assert(err, gc.Equals, "Obtained value must be of type []loggo.Entry or SimpleMessage")
 }
 
 func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsStringOrSimpleMessages(c *gc.C) {
-	obtained := []loggo.TestLogValues{
+	obtained := []loggo.Entry{
 		{Level: loggo.INFO, Message: "foo bar"},
 		{Level: loggo.INFO, Message: "baz"},
 		{Level: loggo.DEBUG, Message: "12345"},
@@ -185,7 +185,7 @@ func (s *LogMatchesSuite) TestLogMatchesOnlyAcceptsStringOrSimpleMessages(c *gc.
 }
 
 func (s *LogMatchesSuite) TestLogMatchesFailsOnInvalidRegex(c *gc.C) {
-	var obtained interface{} = []loggo.TestLogValues{{Level: loggo.INFO, Message: "foo bar"}}
+	var obtained interface{} = []loggo.Entry{{Level: loggo.INFO, Message: "foo bar"}}
 	var expected interface{} = []string{"[]foo"}
 
 	result, err := jc.LogMatches.Check([]interface{}{obtained, expected}, nil /* unused */)
