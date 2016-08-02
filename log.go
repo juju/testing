@@ -4,13 +4,16 @@
 package testing
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"time"
+	"path/filepath"
 
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
 )
+
+var logLocation = flag.Bool("loggo.location", false, "Also log the location of the loggo call")
 
 // LoggingSuite redirects the juju logger to the test logger
 // when embedded in a gocheck suite type.
@@ -27,10 +30,19 @@ var logConfig = func() string {
 	return "DEBUG"
 }()
 
-func (w *gocheckWriter) Write(level loggo.Level, module, filename string, line int, timestamp time.Time, message string) {
+func (w *gocheckWriter) Write(entry loggo.Entry) {
+	filename := filepath.Base(entry.Filename)
+	var message string
+	if *logLocation {
+		message = fmt.Sprintf("%s %s %s:%d %s", entry.Level, entry.Module, filename, entry.Line, entry.Message)
+	} else {
+		message = fmt.Sprintf("%s %s %s", entry.Level, entry.Module, entry.Message)
+	}
 	// Magic calldepth value...
-	// TODO (frankban) Document why we are using this magic value.
-	w.c.Output(3, fmt.Sprintf("%s %s %s", level, module, message))
+	// The value says "how far up the call stack do we go to find the location".
+	// It is used to match the standard library log function, and isn't actually
+	// used by gocheck.
+	w.c.Output(3, message)
 }
 
 func (s *LoggingSuite) SetUpSuite(c *gc.C) {
@@ -38,8 +50,7 @@ func (s *LoggingSuite) SetUpSuite(c *gc.C) {
 }
 
 func (s *LoggingSuite) TearDownSuite(c *gc.C) {
-	loggo.ResetLoggers()
-	loggo.ResetWriters()
+	loggo.ResetLogging()
 }
 
 func (s *LoggingSuite) SetUpTest(c *gc.C) {
@@ -51,17 +62,16 @@ func (s *LoggingSuite) TearDownTest(c *gc.C) {
 
 type discardWriter struct{}
 
-func (discardWriter) Write(level loggo.Level, name, filename string, line int, timestamp time.Time, message string) {
+func (discardWriter) Write(entry loggo.Entry) {
 }
 
 func (s *LoggingSuite) setUp(c *gc.C) {
-	loggo.ResetWriters()
+	loggo.ResetLogging()
 	// Don't use the default writer for the test logging, which
 	// means we can still get logging output from tests that
 	// replace the default writer.
-	loggo.ReplaceDefaultWriter(discardWriter{})
-	loggo.RegisterWriter("loggingsuite", &gocheckWriter{c}, loggo.TRACE)
-	loggo.ResetLoggers()
+	loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
+	loggo.RegisterWriter("loggingsuite", &gocheckWriter{c})
 	err := loggo.ConfigureLoggers(logConfig)
 	c.Assert(err, gc.IsNil)
 }

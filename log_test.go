@@ -40,7 +40,7 @@ func (*logSuite) TestLog(c *gc.C) {
 
 	c.Assert(c.GetTestLog(), gc.Matches,
 		".*DEBUG test message 1\n"+
-			".*TRACE juju message 3\n",
+			".*TRACE juju message 3\n$",
 	)
 	c.Assert(logger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)
 	c.Assert(jujuLogger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)
