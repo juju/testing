@@ -30,8 +30,8 @@ func (*logSuite) TestLog(c *gc.C) {
 	jujuLogger.Tracef("message 3")
 
 	c.Assert(c.GetTestLog(), gc.Matches,
-		".*DEBUG test log_test.go:28 message 1\n"+
-			".*TRACE juju log_test.go:30 message 3\n",
+		".*DEBUG test message 1\n"+
+			".*TRACE juju message 3\n",
 	)
 	suite.TearDownSuite(c)
 	logger.Debugf("message 1")
@@ -39,8 +39,8 @@ func (*logSuite) TestLog(c *gc.C) {
 	jujuLogger.Tracef("message 3")
 
 	c.Assert(c.GetTestLog(), gc.Matches,
-		".*DEBUG test log_test.go:28 message 1\n"+
-			".*TRACE juju log_test.go:30 message 3\n$",
+		".*DEBUG test message 1\n"+
+			".*TRACE juju message 3\n$",
 	)
 	c.Assert(logger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)
 	c.Assert(jujuLogger.EffectiveLogLevel(), gc.Equals, loggo.WARNING)

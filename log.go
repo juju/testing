@@ -4,6 +4,7 @@
 package testing
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
 )
+
+var logLocation = flag.Bool("loggo.location", false, "Also log the location of the loggo call")
 
 // LoggingSuite redirects the juju logger to the test logger
 // when embedded in a gocheck suite type.
@@ -28,10 +31,18 @@ var logConfig = func() string {
 }()
 
 func (w *gocheckWriter) Write(entry loggo.Entry) {
-	// Magic calldepth value...
-	// TODO (frankban) Document why we are using this magic value.
 	filename := filepath.Base(entry.Filename)
-	w.c.Output(3, fmt.Sprintf("%s %s %s:%d %s", entry.Level, entry.Module, filename, entry.Line, entry.Message))
+	var message string
+	if *logLocation {
+		message = fmt.Sprintf("%s %s %s:%d %s", entry.Level, entry.Module, filename, entry.Line, entry.Message)
+	} else {
+		message = fmt.Sprintf("%s %s %s", entry.Level, entry.Module, entry.Message)
+	}
+	// Magic calldepth value...
+	// The value says "how far up the call stack do we go to find the location".
+	// It is used to match the standard library log function, and isn't actually
+	// used by gocheck.
+	w.c.Output(3, message)
 }
 
 func (s *LoggingSuite) SetUpSuite(c *gc.C) {
