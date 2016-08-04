@@ -11,54 +11,47 @@ import (
 	"github.com/juju/utils/clock"
 )
 
-// timerClock exposes the underlying Clock's capabilities to a Timer.
-type timerClock interface {
-	reset(id int, d time.Duration) bool
-	stop(id int) bool
-}
-
-// Timer implements a mock clock.Timer for testing purposes.
-type Timer struct {
-	ID    int
-	clock timerClock
+// timer implements a mock clock.Timer for testing purposes.
+type timer struct {
+	deadline time.Time
+	clock    *Clock
+	c        chan time.Time
+	// trigger is called when the timer expires. It is
+	// called with the clock mutex held and will not block.
+	trigger func()
 }
 
 // Reset is part of the clock.Timer interface.
-func (t *Timer) Reset(d time.Duration) bool {
-	return t.clock.reset(t.ID, d)
+func (t *timer) Reset(d time.Duration) bool {
+	return t.clock.reset(t, d)
 }
 
 // Stop is part of the clock.Timer interface.
-func (t *Timer) Stop() bool {
-	return t.clock.stop(t.ID)
+func (t *timer) Stop() bool {
+	return t.clock.stop(t)
 }
 
-// stoppedTimer is a no-op implementation of clock.Timer.
-type stoppedTimer struct{}
-
-// Reset is part of the clock.Timer interface.
-func (stoppedTimer) Reset(time.Duration) bool { return false }
-
-// Stop is part of the clock.Timer interface.
-func (stoppedTimer) Stop() bool { return false }
+// Chan is part of the clock.Timer interface.
+func (t *timer) Chan() <-chan time.Time {
+	return t.c
+}
 
 // Clock implements a mock clock.Clock for testing purposes.
 type Clock struct {
-	mu             sync.Mutex
-	now            time.Time
-	alarms         []alarm
-	currentAlarmID int
-	notifyAlarms   chan struct{}
+	mu           sync.Mutex
+	now          time.Time
+	waiting      []*timer // timers waiting to fire, sorted by deadline.
+	notifyAlarms chan struct{}
 }
 
 // NewClock returns a new clock set to the supplied time. If your SUT needs to
-// call After, AfterFunc, or Timer.Reset more than 1024 times: (1) you have
+// call After, AfterFunc, NewTimer or Timer.Reset more than 10000 times: (1) you have
 // probably written a bad test; and (2) you'll need to read from the Alarms
 // chan to keep the buffer clear.
 func NewClock(now time.Time) *Clock {
 	return &Clock{
 		now:          now,
-		notifyAlarms: make(chan struct{}, 1024),
+		notifyAlarms: make(chan struct{}, 10000),
 	}
 }
 
@@ -71,29 +64,36 @@ func (clock *Clock) Now() time.Time {
 
 // After is part of the clock.Clock interface.
 func (clock *Clock) After(d time.Duration) <-chan time.Time {
-	defer clock.notifyAlarm()
-	clock.mu.Lock()
-	defer clock.mu.Unlock()
-	notify := make(chan time.Time, 1)
-	if d <= 0 {
-		notify <- clock.now
-	} else {
-		clock.setAlarm(clock.now.Add(d), func() { notify <- clock.now })
-	}
-	return notify
+	return clock.NewTimer(d).Chan()
+}
+
+func (clock *Clock) NewTimer(d time.Duration) clock.Timer {
+	c := make(chan time.Time, 1)
+	return clock.addAlarm(d, c, func() {
+		c <- clock.now
+	})
 }
 
 // AfterFunc is part of the clock.Clock interface.
 func (clock *Clock) AfterFunc(d time.Duration, f func()) clock.Timer {
+	return clock.addAlarm(d, nil, func() {
+		go f()
+	})
+}
+
+func (clock *Clock) addAlarm(d time.Duration, c chan time.Time, trigger func()) *timer {
 	defer clock.notifyAlarm()
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
-	if d <= 0 {
-		f()
-		return &stoppedTimer{}
+	t := &timer{
+		c:        c,
+		deadline: clock.now.Add(d),
+		clock:    clock,
+		trigger:  trigger,
 	}
-	id := clock.setAlarm(clock.now.Add(d), f)
-	return &Timer{id, clock}
+	clock.addTimer(t)
+	clock.triggerAll()
+	return t
 }
 
 // Advance advances the result of Now by the supplied duration, and sends
@@ -102,15 +102,7 @@ func (clock *Clock) Advance(d time.Duration) {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
 	clock.now = clock.now.Add(d)
-	triggered := 0
-	for _, alarm := range clock.alarms {
-		if clock.now.Before(alarm.time) {
-			break
-		}
-		alarm.trigger()
-		triggered++
-	}
-	clock.alarms = clock.alarms[triggered:]
+	clock.triggerAll()
 }
 
 // Alarms returns a channel on which you can read one value for every call to
@@ -121,50 +113,60 @@ func (clock *Clock) Alarms() <-chan struct{} {
 	return clock.notifyAlarms
 }
 
+// triggerAll triggers any alarms that are currently due and removes them
+// from clock.waiting.
+func (clock *Clock) triggerAll() {
+	triggered := 0
+	for _, t := range clock.waiting {
+		if clock.now.Before(t.deadline) {
+			break
+		}
+		t.trigger()
+		triggered++
+	}
+	clock.waiting = clock.waiting[triggered:]
+}
+
 // reset is the underlying implementation of clock.Timer.Reset, which may be
 // called by any Timer backed by this Clock.
-func (clock *Clock) reset(id int, d time.Duration) bool {
+func (clock *Clock) reset(t *timer, d time.Duration) bool {
+	defer clock.notifyAlarm()
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
 
-	for i, alarm := range clock.alarms {
-		if id == alarm.ID {
-			defer clock.notifyAlarm()
-			clock.alarms[i].time = clock.now.Add(d)
-			sort.Sort(byTime(clock.alarms))
-			return true
+	found := false
+	for _, wt := range clock.waiting {
+		if wt == t {
+			found = true
 		}
 	}
-	return false
+	if !found {
+		clock.waiting = append(clock.waiting, t)
+	}
+	t.deadline = clock.now.Add(d)
+	sort.Sort(byDeadline(clock.waiting))
+	return found
 }
 
 // stop is the underlying implementation of clock.Timer.Reset, which may be
 // called by any Timer backed by this Clock.
-func (clock *Clock) stop(id int) bool {
+func (clock *Clock) stop(t *timer) bool {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
 
-	for i, alarm := range clock.alarms {
-		if id == alarm.ID {
-			clock.alarms = removeFromSlice(clock.alarms, i)
+	for i, wt := range clock.waiting {
+		if wt == t {
+			clock.waiting = removeFromSlice(clock.waiting, i)
 			return true
 		}
 	}
 	return false
 }
 
-// setAlarm adds an alarm at time t.
-// It also sorts the alarms and increments the current ID by 1.
-func (clock *Clock) setAlarm(t time.Time, trigger func()) int {
-	alarm := alarm{
-		time:    t,
-		trigger: trigger,
-		ID:      clock.currentAlarmID,
-	}
-	clock.alarms = append(clock.alarms, alarm)
-	sort.Sort(byTime(clock.alarms))
-	clock.currentAlarmID = clock.currentAlarmID + 1
-	return alarm.ID
+// addTimer adds an alarm at time t.
+func (clock *Clock) addTimer(t *timer) {
+	clock.waiting = append(clock.waiting, t)
+	sort.Sort(byDeadline(clock.waiting))
 }
 
 // notifyAlarm sends a value on the channel exposed by Alarms().
@@ -176,22 +178,15 @@ func (clock *Clock) notifyAlarm() {
 	}
 }
 
-// alarm records the time at which we're expected to execute trigger.
-type alarm struct {
-	ID      int
-	time    time.Time
-	trigger func()
-}
+// byDeadline is used to sort alarms by time.
+type byDeadline []*timer
 
-// byTime is used to sort alarms by time.
-type byTime []alarm
-
-func (a byTime) Len() int           { return len(a) }
-func (a byTime) Less(i, j int) bool { return a[i].time.Before(a[j].time) }
-func (a byTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byDeadline) Len() int           { return len(a) }
+func (a byDeadline) Less(i, j int) bool { return a[i].deadline.Before(a[j].deadline) }
+func (a byDeadline) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 // removeFromSlice removes item at the specified index from the slice.
-func removeFromSlice(sl []alarm, index int) []alarm {
+func removeFromSlice(sl []*timer, index int) []*timer {
 	return append(sl[:index], sl[index+1:]...)
 }
 
