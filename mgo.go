@@ -27,8 +27,10 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/juju/loggo"
+	"github.com/juju/retry"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"github.com/juju/utils/clock"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
@@ -485,7 +487,23 @@ func (s *MgoSuite) TearDownSuite(c *gc.C) {
 
 // Dial returns a new connection to the MongoDB server.
 func (inst *MgoInstance) Dial() (*mgo.Session, error) {
-	return mgo.DialWithInfo(inst.DialInfo())
+	var session *mgo.Session
+	err := retry.Call(retry.CallArgs{
+		Func: func() error {
+			var err error
+			session, err = mgo.DialWithInfo(inst.DialInfo())
+			return err
+		},
+		// Only interested in retrying the intermittent
+		// 'unexpected message'.
+		IsFatalError: func(err error) bool {
+			return !strings.HasSuffix(err.Error(), "unexpected message")
+		},
+		Delay:    time.Millisecond,
+		Clock:    clock.WallClock,
+		Attempts: 5,
+	})
+	return session, err
 }
 
 // DialInfo returns information suitable for dialling the
