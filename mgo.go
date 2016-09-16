@@ -422,7 +422,19 @@ func MgoTestPackage(t *testing.T, certs *Certs) {
 	gc.TestingT(t)
 }
 
+type mgoLogger struct {
+	logger loggo.Logger
+}
+
+// Output implements the mgo log_Logger interface.
+func (s *mgoLogger) Output(calldepth int, message string) error {
+	s.logger.LogCallf(calldepth, loggo.TRACE, message)
+	return nil
+}
+
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
+	mgo.SetLogger(&mgoLogger{loggo.GetLogger("mgo")})
+	mgo.SetDebug(true)
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
@@ -483,6 +495,8 @@ func (s *MgoSuite) TearDownSuite(c *gc.C) {
 	err := MgoServer.Reset()
 	c.Assert(err, jc.ErrorIsNil)
 	utils.FastInsecureHash = false
+	mgo.SetDebug(false)
+	mgo.SetLogger(nil)
 }
 
 // Dial returns a new connection to the MongoDB server.
@@ -758,6 +772,7 @@ func (inst *MgoInstance) EnsureRunning() error {
 	// If the server has already been destroyed for testing purposes,
 	// just start it again.
 	if inst.Addr() == "" {
+		logger.Debugf("restarting mongo instance")
 		err := inst.Start(inst.certs)
 		return errors.Annotatef(err, "inst.Start(%v) failed", inst.certs)
 	}
@@ -772,7 +787,17 @@ func (s *MgoSuite) TearDownTest(c *gc.C) {
 	err := MgoServer.EnsureRunning()
 	c.Assert(err, jc.ErrorIsNil)
 
-	if err = s.Session.Ping(); err != nil {
+	// If the Session we have doesn't know about
+	// the address of the server, then we should reconnect.
+	foundAddress := false
+	for _, addr := range s.Session.LiveServers() {
+		if addr == MgoServer.Addr() {
+			foundAddress = true
+			break
+		}
+	}
+
+	if !foundAddress {
 		// The test has killed the server - reconnect.
 		s.Session.Close()
 		s.Session, err = MgoServer.Dial()
