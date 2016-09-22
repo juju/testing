@@ -824,6 +824,38 @@ func (s *MgoSuite) TearDownTest(c *gc.C) {
 	}
 }
 
+// ProxiedSession represents a mongo session that's
+// proxied through a TCPProxy instance.
+type ProxiedSession struct {
+	*mgo.Session
+	*TCPProxy
+}
+
+// NewProxiedSession returns a ProxiedSession instance that holds a
+// mgo.Session that directs through a TCPProxy instance to the testing
+// mongoDB server, and the proxy instance itself. This allows tests to
+// check what happens when mongo connections are broken.
+//
+// The returned value should be closed after use.
+func NewProxiedSession(c *gc.C) *ProxiedSession {
+	mgoInfo := MgoServer.DialInfo()
+	c.Assert(mgoInfo.Addrs, gc.HasLen, 1)
+	proxy := NewTCPProxy(c, mgoInfo.Addrs[0])
+	mgoInfo.Addrs = []string{proxy.Addr()}
+	session, err := mgo.DialWithInfo(mgoInfo)
+	c.Assert(err, gc.IsNil)
+	return &ProxiedSession{
+		Session:  session,
+		TCPProxy: proxy,
+	}
+}
+
+// Close closes s.Session and s.TCPProxy.
+func (s *ProxiedSession) Close() {
+	s.Session.Close()
+	s.TCPProxy.Close()
+}
+
 // FindTCPPort finds an unused TCP port and returns it.
 // Use of this function has an inherent race condition - another
 // process may claim the port before we try to use it.
