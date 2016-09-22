@@ -11,6 +11,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/juju/testing"
+	jc "github.com/juju/testing/checkers"
 )
 
 type mgoSuite struct {
@@ -83,4 +84,15 @@ func (s *mgoSuite) TestStartIPv6(c *gc.C) {
 	session, err := mgo.DialWithInfo(info)
 	c.Assert(err, gc.IsNil)
 	session.Close()
+}
+
+func (s *mgoSuite) TestNewProxiedSession(c *gc.C) {
+	session := testing.NewProxiedSession(c)
+	defer session.Close()
+	err := session.Ping()
+	c.Assert(err, jc.ErrorIsNil)
+	session.CloseConns()
+	err = session.Ping()
+	// There's no consistent error in this case.
+	c.Assert(err, gc.Not(gc.Equals), nil)
 }
