@@ -279,9 +279,9 @@ func (inst *MgoInstance) run() error {
 			}
 			listening <- err
 		}
-		// Capture the last 20 lines of output from mongod, to log
+		// Capture the last 100 lines of output from mongod, to log
 		// in the event of unclean exit.
-		lines := readLastLines(prefix, io.MultiReader(&buf, out), 20)
+		lines := readLastLines(prefix, io.MultiReader(&buf, out), 100)
 		err = server.Wait()
 		exitErr, _ := err.(*exec.ExitError)
 		if err == nil || exitErr != nil && exitErr.Exited() {
