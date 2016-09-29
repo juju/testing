@@ -4,14 +4,18 @@
 package testing_test
 
 import (
-	gc "gopkg.in/check.v1"
 	"sync"
 	"time"
 
+	gc "gopkg.in/check.v1"
+
 	"github.com/juju/testing"
+	jc "github.com/juju/testing/checkers"
 )
 
-type clockSuite struct{}
+type clockSuite struct {
+	testing.LoggingSuite
+}
 
 var _ = gc.Suite(&clockSuite{})
 
@@ -25,6 +29,35 @@ var (
 	shortWait = 50 * time.Millisecond
 	longWait  = time.Second
 )
+
+func (*clockSuite) TestAdvanceLogs(c *gc.C) {
+	t0 := time.Now()
+	cl := testing.NewClock(t0)
+
+	// Shouldn't log anything.
+	t := cl.After(time.Second)
+	cl.Advance(time.Minute)
+	<-t
+	c.Check(c.GetTestLog(), jc.DeepEquals, "")
+
+	// Should log since nothing's waiting.
+	cl.Advance(time.Hour)
+	c.Check(c.GetTestLog(), jc.Contains, "advancing a clock that has nothing waiting: cf. https://github.com/juju/juju/wiki/Intermittent-failures")
+}
+
+func (*clockSuite) TestWaitAdvance(c *gc.C) {
+	t0 := time.Now()
+	cl := testing.NewClock(t0)
+
+	// Test that no timers errors out.
+	err := cl.WaitAdvance(time.Millisecond, 10*time.Millisecond, 1)
+	c.Check(err, gc.ErrorMatches, "got 0 timers added after waiting 10ms: wanted 1")
+
+	// Test that a timer doesn't error.
+	_ = cl.After(time.Nanosecond)
+	err = cl.WaitAdvance(time.Millisecond, 10*time.Millisecond, 1)
+	c.Check(err, jc.ErrorIsNil)
+}
 
 func (*clockSuite) TestAdvanceWithAfter(c *gc.C) {
 	t0 := time.Now()
