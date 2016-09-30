@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/juju/utils/clock"
 )
 
@@ -45,9 +46,9 @@ type Clock struct {
 }
 
 // NewClock returns a new clock set to the supplied time. If your SUT needs to
-// call After, AfterFunc, NewTimer or Timer.Reset more than 10000 times: (1) you have
-// probably written a bad test; and (2) you'll need to read from the Alarms
-// chan to keep the buffer clear.
+// call After, AfterFunc, NewTimer or Timer.Reset more than 10000 times: (1)
+// you have probably written a bad test; and (2) you'll need to read from the
+// Alarms chan to keep the buffer clear.
 func NewClock(now time.Time) *Clock {
 	return &Clock{
 		now:          now,
@@ -102,7 +103,43 @@ func (clock *Clock) Advance(d time.Duration) {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
 	clock.now = clock.now.Add(d)
+	if len(clock.waiting) == 0 {
+		logger.Debugf("advancing a clock that has nothing waiting: cf. https://github.com/juju/juju/wiki/Intermittent-failures")
+	}
 	clock.triggerAll()
+}
+
+// WaitAdvance functions the same as Advance, but only if there is n timers in
+// clock.waiting. This came about while fixing lp:1607044 intermittent
+// failures.  It turns out that testing.Clock.Advance might advance the time
+// and trigger notifications before triggers are set. So we wait a limited time
+// 'w' for 'n' timers to show up in clock.waiting, and if they do we advance
+// 'd'.
+func (clock *Clock) WaitAdvance(d, w time.Duration, n int) error {
+	if w == 0 {
+		w = time.Second
+	}
+	pause := w / 10
+	for i := 0; i < 10; i++ {
+		if clock.hasNWaiters(n) {
+			clock.Advance(d)
+			return nil
+		}
+		time.Sleep(pause)
+	}
+	clock.mu.Lock()
+	got := len(clock.waiting)
+	clock.mu.Unlock()
+	return errors.Errorf(
+		"got %d timers added after waiting %s: wanted %d", got, w.String(), n)
+}
+
+// hasNWaiters checks if the clock currently has 'n' timers waiting to fire.
+func (clock *Clock) hasNWaiters(n int) bool {
+	clock.mu.Lock()
+	hasWaiters := len(clock.waiting) == n
+	clock.mu.Unlock()
+	return hasWaiters
 }
 
 // Alarms returns a channel on which you can read one value for every call to
