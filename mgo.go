@@ -844,6 +844,8 @@ func NewProxiedSession(c *gc.C) *ProxiedSession {
 	mgoInfo.Addrs = []string{proxy.Addr()}
 	session, err := mgo.DialWithInfo(mgoInfo)
 	c.Assert(err, gc.IsNil)
+	err = session.Ping()
+	c.Assert(err, jc.ErrorIsNil)
 	return &ProxiedSession{
 		Session:  session,
 		TCPProxy: proxy,
