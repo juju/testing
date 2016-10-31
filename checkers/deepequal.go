@@ -10,8 +10,11 @@ package checkers
 import (
 	"fmt"
 	"reflect"
+	"time"
 	"unsafe"
 )
+
+var timeType = reflect.TypeOf(time.Time{})
 
 // During deepValueEqual, must keep track of checks that are
 // in progress.  The comparison algorithm assumes that all
@@ -34,7 +37,17 @@ func (err *mismatchError) Error() string {
 	if path == "" {
 		path = "top level"
 	}
-	return fmt.Sprintf("mismatch at %s: %s; obtained %#v; expected %#v", path, err.how, interfaceOf(err.v1), interfaceOf(err.v2))
+	return fmt.Sprintf("mismatch at %s: %s; obtained %#v; expected %#v", path, err.how, printable(err.v1), printable(err.v2))
+}
+
+func printable(v reflect.Value) interface{} {
+	vi := interfaceOf(v)
+	switch vi := vi.(type) {
+	case time.Time:
+		return vi.UTC().Format(time.RFC3339Nano)
+	default:
+		return vi
+	}
 }
 
 // Tests for deep equality using reflected types. The map argument tracks
@@ -133,6 +146,15 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 	case reflect.Ptr:
 		return deepValueEqual("(*"+path+")", v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Struct:
+		if v1.Type() == timeType {
+			// Special case for time - we ignore the time zone.
+			t1 := interfaceOf(v1).(time.Time)
+			t2 := interfaceOf(v2).(time.Time)
+			if t1.Equal(t2) {
+				return true, nil
+			}
+			return false, errorf("unequal")
+		}
 		for i, n := 0, v1.NumField(); i < n; i++ {
 			path := path + "." + v1.Type().Field(i).Name
 			if ok, err := deepValueEqual(path, v1.Field(i), v2.Field(i), visited, depth+1); !ok {
@@ -214,9 +236,13 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 // equality. DeepEqual correctly handles recursive types. Functions are
 // equal only if they are both nil.
 //
-// DeepEqual differs from reflect.DeepEqual in that an empty slice is
-// equal to a nil slice. If the two values compare unequal, the
-// resulting error holds the first difference encountered.
+// DeepEqual differs from reflect.DeepEqual in two ways:
+// - an empty slice is considered equal to a nil slice.
+// - two time.Time values that represent the same instant
+// but with different time zones are considered equal.
+//
+// If the two values compare unequal, the resulting error holds the
+// first difference encountered.
 func DeepEqual(a1, a2 interface{}) (bool, error) {
 	errorf := func(f string, a ...interface{}) error {
 		return &mismatchError{

@@ -13,6 +13,7 @@ package checkers_test
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/juju/testing/checkers"
 )
@@ -56,6 +57,9 @@ var deepEqualTests = []DeepEqualTest{
 	{error(nil), error(nil), true, ""},
 	{map[int]string{1: "one", 2: "two"}, map[int]string{2: "two", 1: "one"}, true, ""},
 	{fn1, fn2, true, ""},
+	{time.Unix(0, 0), time.Unix(0, 0), true, ""},
+	// Same time from different zones (difference from normal DeepEqual)
+	{time.Unix(0, 0).UTC(), time.Unix(0, 0).In(time.FixedZone("FOO", 60*60)), true, ""},
 
 	// Inequalities
 	{1, 2, false, `mismatch at top level: unequal; obtained 1; expected 2`},
@@ -89,6 +93,9 @@ var deepEqualTests = []DeepEqualTest{
 	{[]int{1, 2, 3}, [3]int{1, 2, 3}, false, `mismatch at top level: type mismatch \[\]int vs \[3\]int; obtained \[\]int\{1, 2, 3\}; expected \[3\]int\{1, 2, 3\}`},
 	{&[3]interface{}{1, 2, 4}, &[3]interface{}{1, 2, "s"}, false, `mismatch at \(\*\)\[2\]: type mismatch int vs string; obtained 4; expected "s"`},
 	{Basic{1, 0.5}, NotBasic{1, 0.5}, false, `mismatch at top level: type mismatch checkers_test\.Basic vs checkers_test\.NotBasic; obtained checkers_test\.Basic\{x:1, y:0\.5\}; expected checkers_test\.NotBasic\{x:1, y:0\.5\}`},
+	{time.Unix(0, 0).UTC(), time.Unix(0, 0).In(time.FixedZone("FOO", 60*60)).Add(1), false, `mismatch at top level: unequal; obtained "1970-01-01T00:00:00Z"; expected "1970-01-01T00:00:00.000000001Z"`},
+	{time.Unix(0, 0).UTC(), time.Unix(0, 0).Add(1), false, `mismatch at top level: unequal; obtained "1970-01-01T00:00:00Z"; expected "1970-01-01T00:00:00.000000001Z"`},
+
 	{
 		map[uint]string{1: "one", 2: "two"},
 		map[int]string{2: "two", 1: "one"},
@@ -107,10 +114,14 @@ func TestDeepEqual(t *testing.T) {
 			if err != nil {
 				t.Errorf("deepEqual(%v, %v): unexpected error message %q when equal", test.a, test.b, err)
 			}
-		} else {
-			if ok, _ := regexp.MatchString(test.msg, err.Error()); !ok {
-				t.Errorf("deepEqual(%v, %v); unexpected error %q, want %q", test.a, test.b, err.Error(), test.msg)
-			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("deepEqual(%v, %v); mismatch but nil error", test.a, test.b)
+			continue
+		}
+		if ok, _ := regexp.MatchString(test.msg, err.Error()); !ok {
+			t.Errorf("deepEqual(%v, %v); unexpected error %q, want %q", test.a, test.b, err.Error(), test.msg)
 		}
 	}
 }
