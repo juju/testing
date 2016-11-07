@@ -230,7 +230,7 @@ func (inst *MgoInstance) run() error {
 		mgoargs = append(mgoargs,
 			"--sslOnNormalPorts",
 			"--sslPEMKeyFile", filepath.Join(inst.dir, "server.pem"),
-			"--sslPEMKeyPassword", "ignored")
+			"--sslPEMKeyPassword=ignored")
 	}
 	version, err := mongoVersion.Get()
 	if err != nil {
