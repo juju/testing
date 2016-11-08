@@ -499,6 +499,16 @@ func (s *MgoSuite) TearDownSuite(c *gc.C) {
 	mgo.SetLogger(nil)
 }
 
+// MustDial returns a new connection to the MongoDB server, and panics on
+// errors.
+func (inst *MgoInstance) MustDial() *mgo.Session {
+	s, err := mgo.DialWithInfo(inst.DialInfo())
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // Dial returns a new connection to the MongoDB server.
 func (inst *MgoInstance) Dial() (*mgo.Session, error) {
 	var session *mgo.Session
