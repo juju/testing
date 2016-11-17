@@ -248,7 +248,7 @@ func (inst *MgoInstance) run() error {
 		return err
 	}
 	logger.Debugf("found mongod at: %q", mongopath)
-	if mongopath == "/usr/lib/juju/bin/mongod" {
+	if mongopath == "/usr/lib/juju/bin/mongod" || mongopath == "/usr/lib/juju/mongo3.2/bin/mongod" {
 		inst.WithoutV8 = true
 	}
 	server := exec.Command(mongopath, mgoargs...)
@@ -312,7 +312,7 @@ func (inst *MgoInstance) run() error {
 
 func getMongod() (string, error) {
 	// The last path is needed in tests on CentOS where PATH is being completely removed
-	paths := []string{"mongod", "/usr/lib/juju/bin/mongod", "/usr/local/bin/mongod"}
+	paths := []string{"mongod", "/usr/lib/juju/bin/mongod", "/usr/lib/juju/mongo3.2/bin/mongod", "/usr/local/bin/mongod"}
 	if path := os.Getenv("JUJU_MONGOD"); path != "" {
 		paths = append([]string{path}, paths...)
 	}
