@@ -55,11 +55,16 @@ func (e *ExampleTypeWhichUsesInterface) Div(nums ...int) (int, error) {
 
 func Example() {
 	var logger loggo.Logger
+
+	// Set a fake type which mocks out calls.
 	mock := &fakeType{CallMocker: testing.NewCallMocker(logger)}
 	mock.Call("Add", 1, 1).Returns(2)
 	mock.Call("Div", 1, 1).Returns(1, nil)
 	mock.Call("Div", 1, 0).Returns(0, fmt.Errorf("cannot divide by zero"))
 
+	// Pass in the mock which satisifes a dependency of
+	// ExampleTypeWhichUsesInterface. This allows us to inject mocked
+	// calls.
 	example := ExampleTypeWhichUsesInterface{calculator: mock}
 	if example.Add(1, 1) != 2 {
 		log.Fatal("unexpected result")
