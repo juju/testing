@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
@@ -105,6 +106,42 @@ func (*tcpProxySuite) TestCloseConns(c *gc.C) {
 	wg.Wait()
 }
 
+func (*tcpProxySuite) TestPauseConns(c *gc.C) {
+	var wg sync.WaitGroup
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	c.Assert(err, gc.IsNil)
+	defer listener.Close()
+	wg.Add(1)
+	go tcpEcho(&wg, listener)
+
+	p := testing.NewTCPProxy(c, listener.Addr().String())
+	c.Assert(p.Addr(), gc.Not(gc.Equals), listener.Addr().String())
+
+	// Make a connection through the proxy
+	// and test that it works.
+	conn, err := net.Dial("tcp", p.Addr())
+	c.Assert(err, gc.IsNil)
+	defer conn.Close()
+	assertEcho(c, conn)
+
+	p.PauseConns()
+
+	msg := "hello, world\n"
+	n, err := fmt.Fprint(conn, msg)
+	c.Assert(err, gc.IsNil)
+	c.Assert(n, gc.Equals, len(msg))
+	assertReadTimeout(c, conn)
+
+	p.ResumeConns()
+
+	buf := make([]byte, n)
+	n, err = conn.Read(buf)
+	c.Assert(err, gc.IsNil)
+	c.Assert(n, gc.Equals, len(msg))
+	c.Assert(string(buf), gc.Equals, msg)
+}
+
 // tcpEcho listens on the given listener for TCP connections,
 // writes all traffic received back to the sender, and calls
 // wg.Done when all its goroutines have completed.
@@ -139,4 +176,16 @@ func assertEOF(c *gc.C, r io.Reader) {
 	n, err := r.Read(make([]byte, 1))
 	c.Assert(err, gc.Equals, io.EOF)
 	c.Assert(n, gc.Equals, 0)
+}
+
+func assertReadTimeout(c *gc.C, conn net.Conn) {
+	err := conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	c.Assert(err, gc.IsNil)
+	defer conn.SetReadDeadline(time.Time{})
+	buf := make([]byte, 1)
+	n, err := conn.Read(buf)
+	c.Assert(n, gc.Equals, 0)
+	nerr, ok := err.(net.Error)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(nerr.Timeout(), gc.Equals, true)
 }

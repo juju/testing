@@ -18,8 +18,13 @@ type TCPProxy struct {
 	listener net.Listener
 	// mu guards the fields below it.
 	mu sync.Mutex
+	// stopStart holds a condition variable that broadcasts changes
+	// in the paused state.
+	stopStart sync.Cond
 	// closed holds whether the proxy has been closed.
 	closed bool
+	// paused holds whether the proxy has been paused.
+	paused bool
 	// conns holds all connections that have been made.
 	conns []io.Closer
 }
@@ -33,6 +38,7 @@ func NewTCPProxy(c *gc.C, remoteAddr string) *TCPProxy {
 	p := &TCPProxy{
 		listener: listener,
 	}
+	p.stopStart.L = &p.mu
 	go func() {
 		for {
 			client, err := p.listener.Accept()
@@ -51,8 +57,8 @@ func NewTCPProxy(c *gc.C, remoteAddr string) *TCPProxy {
 				return
 			}
 			p.addConn(server)
-			go stream(client, server)
-			go stream(server, client)
+			go p.stream(client, server)
+			go p.stream(server, client)
 		}
 	}()
 	return p
@@ -91,6 +97,22 @@ func (p *TCPProxy) CloseConns() {
 	}
 }
 
+// PauseConns stops all traffic flowing through the proxy.
+func (p *TCPProxy) PauseConns() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.paused = true
+	p.stopStart.Broadcast()
+}
+
+// ResumeConns resumes sending traffic through the proxy.
+func (p *TCPProxy) ResumeConns() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.paused = false
+	p.stopStart.Broadcast()
+}
+
 // Addr returns the TCP address of the proxy. Dialing
 // this address will cause a connection to be made
 // to the remote address; any data written will be
@@ -108,8 +130,25 @@ func (p *TCPProxy) isClosed() bool {
 	return p.closed
 }
 
-func stream(dst io.WriteCloser, src io.ReadCloser) {
+func (p *TCPProxy) stream(dst io.WriteCloser, src io.ReadCloser) {
 	defer dst.Close()
 	defer src.Close()
-	io.Copy(dst, src)
+	buf := make([]byte, 32*1024)
+	for {
+		nr, err := src.Read(buf)
+		p.mu.Lock()
+		for p.paused {
+			p.stopStart.Wait()
+		}
+		p.mu.Unlock()
+		if nr > 0 {
+			_, err := dst.Write(buf[0:nr])
+			if err != nil {
+				break
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
 }
