@@ -122,6 +122,12 @@ const mgoDialTimeout = 60 * time.Second
 // MongoDB server.
 type MgoSuite struct {
 	Session *mgo.Session
+
+	// DebugMgo controls whether SetUpSuite enables mgo logging and
+	// debugging. Set this before calling SetUpSuite. Enabling either
+	// logging or debugging in mgo adds a significant overhead to the
+	// Juju tests, so they are disabled by default.
+	DebugMgo bool
 }
 
 // generatePEM receives server certificate and the server private key
@@ -433,8 +439,10 @@ func (s *mgoLogger) Output(calldepth int, message string) error {
 }
 
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
-	mgo.SetLogger(&mgoLogger{loggo.GetLogger("mgo")})
-	mgo.SetDebug(true)
+	if s.DebugMgo {
+		mgo.SetLogger(&mgoLogger{loggo.GetLogger("mgo")})
+		mgo.SetDebug(true)
+	}
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
@@ -495,8 +503,10 @@ func (s *MgoSuite) TearDownSuite(c *gc.C) {
 	err := MgoServer.Reset()
 	c.Assert(err, jc.ErrorIsNil)
 	utils.FastInsecureHash = false
-	mgo.SetDebug(false)
-	mgo.SetLogger(nil)
+	if s.DebugMgo {
+		mgo.SetDebug(false)
+		mgo.SetLogger(nil)
+	}
 }
 
 // MustDial returns a new connection to the MongoDB server, and panics on
