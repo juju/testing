@@ -43,7 +43,7 @@ var (
 	logger    = loggo.GetLogger("juju.testing")
 
 	// regular expression to match output of mongod
-	waitingForConnectionsRe = regexp.MustCompile(".*initandlisten.*waiting for connections.*")
+	waitingForConnectionsRe = regexp.MustCompile(".*waiting for connections.*")
 
 	// After version 3.2 we shouldn't use --nojournal - it makes the
 	// WiredTiger storage engine much slower.
