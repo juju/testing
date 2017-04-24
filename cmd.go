@@ -49,8 +49,8 @@ const (
 	// $name.exitcodes does not exist, or the list runs out, return 0.
 	EchoQuotedArgsUnix = `#!/bin/bash --norc
 name=` + "`basename $0`" + `
-argfile="$name.out"
-exitcodesfile="$name.exitcodes"
+argfile="$0.out"
+exitcodesfile="$0.exitcodes"
 printf "%s" $name | tee -a $argfile
 for arg in "$@"; do
   printf " '%s'" "$arg" | tee -a $argfile
@@ -177,27 +177,33 @@ func PatchExecutableAsEchoArgs(c *gc.C, patcher CleanupPatcher, execName string,
 }
 
 // AssertEchoArgs is used to check the args from an execution of a command
-// that has been patchec using PatchExecutable containing EchoQuotedArgs.
+// that has been patched using PatchExecutable containing EchoQuotedArgs.
 func AssertEchoArgs(c *gc.C, execName string, args ...string) {
-	// Read in entire argument log file
-	content, err := ioutil.ReadFile(execName + ".out")
-	c.Assert(err, gc.IsNil)
-	lines := strings.Split(string(content), "\n")
-
 	// Create expected output string
 	expected := execName
 	for _, arg := range args {
 		expected = fmt.Sprintf("%s %s", expected, utils.ShQuote(arg))
 	}
-
-	// Check that the expected and the first line of actual output are the same
-	actual := strings.TrimSuffix(lines[0], "\r")
-
+	actual := ReadEchoArgs(c, execName)
 	c.Assert(actual, gc.Equals, expected)
+}
+
+// ReadEchoArgs is used to read the args from an execution of a command
+// that has been patched using PatchExecutable containing EchoQuotedArgs.
+func ReadEchoArgs(c *gc.C, execName string) string {
+	execPath, err := exec.LookPath(execName)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Read in entire argument log file
+	content, err := ioutil.ReadFile(execPath + ".out")
+	c.Assert(err, jc.ErrorIsNil)
+	lines := strings.Split(string(content), "\n")
+	actual := strings.TrimSuffix(lines[0], "\r")
 
 	// Write out the remaining lines for the next check
 	content = []byte(strings.Join(lines[1:], "\n"))
-	err = ioutil.WriteFile(execName+".out", content, 0644) // or just call this filename somewhere, once.
+	err = ioutil.WriteFile(execPath+".out", content, 0644) // or just call this filename somewhere, once.
+	return actual
 }
 
 // PatchExecHelper is a type that helps you patch out calls to executables by
