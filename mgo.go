@@ -317,11 +317,17 @@ func (inst *MgoInstance) run() error {
 }
 
 func getMongod() (string, error) {
-	// The last path is needed in tests on CentOS where PATH is being completely removed
-	paths := []string{"mongod", "/usr/lib/juju/bin/mongod", "/usr/lib/juju/mongo3.2/bin/mongod", "/usr/local/bin/mongod"}
+	// Prefer $JUJU_MONGOD and then newer MongoDBs.
+	var paths []string
 	if path := os.Getenv("JUJU_MONGOD"); path != "" {
-		paths = append([]string{path}, paths...)
+		paths = append(paths, path)
 	}
+	paths = append(paths,
+		"/usr/lib/juju/mongo3.2/bin/mongod",
+		"mongod",
+		"/usr/lib/juju/bin/mongod",
+		"/usr/local/bin/mongod", // Needed on CentOS where $PATH is being completely removed
+	)
 	var err error
 	var mongopath string
 	for _, path := range paths {
