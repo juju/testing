@@ -49,7 +49,7 @@ var (
 	// WiredTiger storage engine much slower.
 	// https://jira.mongodb.org/browse/SERVER-21198
 	useJournalMongoVersion = version.Number{Major: 3, Minor: 2}
-	mongoVersion           lazyMongoVersion
+	installedMongod        mongodCache
 )
 
 const (
@@ -238,10 +238,13 @@ func (inst *MgoInstance) run() error {
 			"--sslPEMKeyFile", filepath.Join(inst.dir, "server.pem"),
 			"--sslPEMKeyPassword=ignored")
 	}
-	version, err := mongoVersion.Get()
+
+	mongopath, version, err := installedMongod.Get()
 	if err != nil {
 		return err
 	}
+	logger.Debugf("using mongod at: %q (version=%s)", mongopath, version)
+
 	if version.Compare(useJournalMongoVersion) == -1 {
 		mgoargs = append(mgoargs, "--nojournal")
 	}
@@ -249,11 +252,6 @@ func (inst *MgoInstance) run() error {
 	if inst.Params != nil {
 		mgoargs = append(mgoargs, inst.Params...)
 	}
-	mongopath, err := getMongod()
-	if err != nil {
-		return err
-	}
-	logger.Debugf("found mongod at: %q", mongopath)
 	if mongopath == "/usr/lib/juju/bin/mongod" || mongopath == "/usr/lib/juju/mongo3.2/bin/mongod" {
 		inst.WithoutV8 = true
 	}
@@ -316,6 +314,32 @@ func (inst *MgoInstance) run() error {
 	return nil
 }
 
+// mongodCache looks up mongod path and version and caches the result.
+type mongodCache struct {
+	sync.Mutex
+	path    string
+	version version.Number
+	done    bool
+}
+
+func (cache *mongodCache) Get() (string, version.Number, error) {
+	cache.Lock()
+	defer cache.Unlock()
+	if !cache.done {
+		var err error
+		cache.path, err = getMongod()
+		if err != nil {
+			return "", version.Zero, errors.Trace(err)
+		}
+		cache.version, err = detectMongoVersion(cache.path)
+		if err != nil {
+			return "", version.Zero, errors.Trace(err)
+		}
+		cache.done = true
+	}
+	return cache.path, cache.version, nil
+}
+
 func getMongod() (string, error) {
 	// Prefer $JUJU_MONGOD and then newer MongoDBs.
 	var paths []string
@@ -343,11 +367,7 @@ func getMongod() (string, error) {
 // The mongod --version line starts with this prefix.
 const versionLinePrefix = "db version v"
 
-func detectMongoVersion() (version.Number, error) {
-	mongoPath, err := getMongod()
-	if err != nil {
-		return version.Zero, errors.Trace(err)
-	}
+func detectMongoVersion(mongoPath string) (version.Number, error) {
 	output, err := exec.Command(mongoPath, "--version").Output()
 	if err != nil {
 		return version.Zero, errors.Trace(err)
@@ -369,27 +389,7 @@ func detectMongoVersion() (version.Number, error) {
 	if err != nil {
 		return version.Zero, errors.Trace(err)
 	}
-	logger.Debugf("detected mongod version %v", ver)
 	return ver, nil
-}
-
-// lazyMongoVersion stores the mongod version once we've got it.
-type lazyMongoVersion struct {
-	sync.Mutex
-	version version.Number
-}
-
-func (v *lazyMongoVersion) Get() (version.Number, error) {
-	v.Lock()
-	defer v.Unlock()
-	if v.version == version.Zero {
-		ver, err := detectMongoVersion()
-		if err != nil {
-			return version.Zero, errors.Trace(err)
-		}
-		v.version = ver
-	}
-	return v.version, nil
 }
 
 func (inst *MgoInstance) kill(sig os.Signal) {
