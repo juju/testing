@@ -69,24 +69,26 @@ fi
 setlocal enabledelayedexpansion
 set list=%0
 set argCount=0
+set argfile=%~f0.out
+set exitcodesfile=%~f0.exitcodes
 for %%x in (%*) do (
    set /A argCount+=1
    set "argVec[!argCount!]=%%~x"
 )
 for /L %%i in (1,1,%argCount%) do set list=!list! '!argVec[%%i]!'
 
-IF exist %0.exitcodes (
-    FOR /F "tokens=1* delims=;" %%i IN (%0.exitcodes) DO (
+IF exist %exitcodesfile% (
+    FOR /F "tokens=1* delims=;" %%i IN (%exitcodesfile%) DO (
         set exitcode=%%i
         IF NOT [%%j]==[] (
-            echo %%j > %0.exitcodes
+            echo %%j > %exitcodesfile%
         ) ELSE (
-            del %0.exitcodes
+            del %exitcodesfile%
         )
     )
 )
 
-echo %list%>> %0.out
+echo %list%>> %argfile%
 exit /B %exitcode%
 `
 )
@@ -99,7 +101,7 @@ type EnvironmentPatcher interface {
 
 // PatchExecutable creates an executable called 'execName' in a new test
 // directory and that directory is added to the path.
-func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, exitCodes ...int) {
+func PatchExecutable(c *gc.C, patcher EnvironmentPatcher, execName, script string, exitCodes ...int) {
 	dir := c.MkDir()
 	patcher.PatchEnvironment("PATH", joinPathLists(dir, os.Getenv("PATH")))
 	var filename string
@@ -109,12 +111,11 @@ func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, e
 	default:
 		filename = filepath.Join(dir, execName)
 	}
-	os.Remove(filename + ".out")
 	err := ioutil.WriteFile(filename, []byte(script), 0755)
 	c.Assert(err, gc.IsNil)
 
 	if len(exitCodes) > 0 {
-		filename = execName + ".exitcodes"
+		filename := filename + ".exitcodes"
 		codes := make([]string, len(exitCodes))
 		for i, code := range exitCodes {
 			codes[i] = strconv.Itoa(code)
@@ -122,21 +123,12 @@ func PatchExecutable(c *gc.C, patcher CleanupPatcher, execName, script string, e
 		s := strings.Join(codes, ";") + ";"
 		err = ioutil.WriteFile(filename, []byte(s), 0644)
 		c.Assert(err, gc.IsNil)
-		patcher.AddCleanup(func(*gc.C) {
-			os.Remove(filename)
-		})
 	}
-}
-
-// CleanupPatcher represents a value that can patch values for tests.
-type CleanupPatcher interface {
-	PatchEnvironment(name, value string)
-	AddCleanup(cleanup func(*gc.C))
 }
 
 // PatchExecutableThrowError is needed to test cases in which we expect exit
 // codes from executables called from the system path
-func PatchExecutableThrowError(c *gc.C, patcher CleanupPatcher, execName string, exitCode int) {
+func PatchExecutableThrowError(c *gc.C, patcher EnvironmentPatcher, execName string, exitCode int) {
 	switch runtime.GOOS {
 	case "windows":
 		script := fmt.Sprintf(`@echo off
@@ -153,27 +145,19 @@ func PatchExecutableThrowError(c *gc.C, patcher CleanupPatcher, execName string,
                                `, exitCode)
 		PatchExecutable(c, patcher, execName, script)
 	}
-	patcher.AddCleanup(func(*gc.C) {
-		os.Remove(execName + ".out")
-	})
-
 }
 
 // PatchExecutableAsEchoArgs creates an executable called 'execName' in a new
 // test directory and that directory is added to the path. The content of the
 // script is 'EchoQuotedArgs', and the args file is removed using a cleanup
 // function.
-func PatchExecutableAsEchoArgs(c *gc.C, patcher CleanupPatcher, execName string, exitCodes ...int) {
+func PatchExecutableAsEchoArgs(c *gc.C, patcher EnvironmentPatcher, execName string, exitCodes ...int) {
 	switch runtime.GOOS {
 	case "windows":
 		PatchExecutable(c, patcher, execName, EchoQuotedArgsWindows, exitCodes...)
 	default:
 		PatchExecutable(c, patcher, execName, EchoQuotedArgsUnix, exitCodes...)
 	}
-	patcher.AddCleanup(func(*gc.C) {
-		os.Remove(execName + ".out")
-		os.Remove(execName + ".exitcodes")
-	})
 }
 
 // AssertEchoArgs is used to check the args from an execution of a command
