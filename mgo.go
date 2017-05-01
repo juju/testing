@@ -45,18 +45,31 @@ var (
 	// regular expression to match output of mongod
 	waitingForConnectionsRe = regexp.MustCompile(".*waiting for connections.*")
 
+	mongo32 = version.Number{Major: 3, Minor: 2}
+
 	// After version 3.2 we shouldn't use --nojournal - it makes the
 	// WiredTiger storage engine much slower.
 	// https://jira.mongodb.org/browse/SERVER-21198
-	useJournalMongoVersion = version.Number{Major: 3, Minor: 2}
-	installedMongod        mongodCache
+	useJournalMongoVersion = mongo32
+
+	// From mongo 3.2 onwards, we can specify a storage engine.
+	storageEngineMongoVersion = mongo32
+
+	installedMongod mongodCache
 )
 
 const (
 	// Maximum number of times to attempt starting mongod.
 	maxStartMongodAttempts = 5
+
 	// The default password to use when connecting to the mongo database.
 	DefaultMongoPassword = "conn-from-name-secret"
+
+	// defaultMongoStorageEngine is the default storage engine to use
+	// in Mongo 3.2 onwards for tests. We default to mmapv1 (vs. the
+	// mongo default of wiredTiger) for the best performance in tests,
+	// but make it configurable.
+	defaultMongoStorageEngine = "mmapv1"
 )
 
 // Certs holds the certificates and keys required to make a secure
@@ -247,6 +260,13 @@ func (inst *MgoInstance) run() error {
 
 	if version.Compare(useJournalMongoVersion) == -1 {
 		mgoargs = append(mgoargs, "--nojournal")
+	}
+	if version.Compare(storageEngineMongoVersion) >= 0 {
+		storageEngine := os.Getenv("JUJU_MONGO_STORAGE_ENGINE")
+		if storageEngine == "" {
+			storageEngine = defaultMongoStorageEngine
+		}
+		mgoargs = append(mgoargs, "--storageEngine", storageEngine)
 	}
 
 	if inst.Params != nil {
