@@ -126,6 +126,11 @@ func (m *MgoInstance) Port() int {
 	return m.port
 }
 
+// SSLEnabled reports whether or not SSL is enabled for the MongoDB server.
+func (m *MgoInstance) SSLEnabled() bool {
+	return m.certs != nil
+}
+
 // We specify a timeout to mgo.Dial, to prevent
 // mongod failures hanging the tests.
 const mgoDialTimeout = 60 * time.Second
