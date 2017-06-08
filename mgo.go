@@ -252,7 +252,7 @@ func (inst *MgoInstance) run() error {
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
-			"--sslOnNormalPorts",
+			"--sslMode requireSSL",
 			"--sslPEMKeyFile", filepath.Join(inst.dir, "server.pem"),
 			"--sslPEMKeyPassword=ignored")
 	}
