@@ -24,8 +24,8 @@ func deepEqual(a1, a2 interface{}) bool {
 }
 
 type Basic struct {
-	x int
-	y float32
+	X int
+	Y float32
 }
 
 type NotBasic Basic
@@ -69,8 +69,8 @@ var deepEqualTests = []DeepEqualTest{
 	{"hello", "hey", false, `mismatch at top level: unequal; obtained "hello"; expected "hey"`},
 	{make([]int, 10), make([]int, 11), false, `mismatch at top level: length mismatch, 10 vs 11; obtained \[\]int\{0, 0, 0, 0, 0, 0, 0, 0, 0, 0\}; expected \[\]int\{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0\}`},
 	{&[3]int{1, 2, 3}, &[3]int{1, 2, 4}, false, `mismatch at \(\*\)\[2\]: unequal; obtained 3; expected 4`},
-	{Basic{1, 0.5}, Basic{1, 0.6}, false, `mismatch at \.y: unequal; obtained 0\.5; expected 0\.6`},
-	{Basic{1, 0}, Basic{2, 0}, false, `mismatch at \.x: unequal; obtained 1; expected 2`},
+	{Basic{1, 0.5}, Basic{1, 0.6}, false, `mismatch at \.Y: unequal; obtained 0\.5; expected 0\.6`},
+	{Basic{1, 0}, Basic{2, 0}, false, `mismatch at \.X: unequal; obtained 1; expected 2`},
 	{map[int]string{1: "one", 3: "two"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at \[3\]: validity mismatch; obtained "two"; expected <nil>`},
 	{map[int]string{1: "one", 2: "txo"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at \[2\]: unequal; obtained "txo"; expected "two"`},
 	{map[int]string{1: "one"}, map[int]string{2: "two", 1: "one"}, false, `mismatch at top level: length mismatch, 1 vs 2; obtained map\[int\]string\{1:"one"\}; expected map\[int\]string\{.*\}`},
@@ -92,7 +92,7 @@ var deepEqualTests = []DeepEqualTest{
 	{0.5, "hello", false, `mismatch at top level: type mismatch float64 vs string; obtained 0\.5; expected "hello"`},
 	{[]int{1, 2, 3}, [3]int{1, 2, 3}, false, `mismatch at top level: type mismatch \[\]int vs \[3\]int; obtained \[\]int\{1, 2, 3\}; expected \[3\]int\{1, 2, 3\}`},
 	{&[3]interface{}{1, 2, 4}, &[3]interface{}{1, 2, "s"}, false, `mismatch at \(\*\)\[2\]: type mismatch int vs string; obtained 4; expected "s"`},
-	{Basic{1, 0.5}, NotBasic{1, 0.5}, false, `mismatch at top level: type mismatch checkers_test\.Basic vs checkers_test\.NotBasic; obtained checkers_test\.Basic\{x:1, y:0\.5\}; expected checkers_test\.NotBasic\{x:1, y:0\.5\}`},
+	{Basic{1, 0.5}, NotBasic{1, 0.5}, false, `mismatch at top level: type mismatch checkers_test\.Basic vs checkers_test\.NotBasic; obtained checkers_test\.Basic\{X:1, Y:0\.5\}; expected checkers_test\.NotBasic\{X:1, Y:0\.5\}`},
 	{time.Unix(0, 0).UTC(), time.Unix(0, 0).In(time.FixedZone("FOO", 60*60)).Add(1), false, `mismatch at top level: unequal; obtained "1970-01-01T00:00:00Z"; expected "1970-01-01T00:00:00.000000001Z"`},
 	{time.Unix(0, 0).UTC(), time.Unix(0, 0).Add(1), false, `mismatch at top level: unequal; obtained "1970-01-01T00:00:00Z"; expected "1970-01-01T00:00:00.000000001Z"`},
 

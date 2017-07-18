@@ -230,6 +230,9 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 	}
 }
 
+// THIS FUNCTION IS DEPRECATED. Use cmp.Diff instead
+// (see http://godoc.org/github.com/google/go-cmp/cmp).
+//
 // DeepEqual tests for deep equality. It uses normal == equality where
 // possible but will scan elements of arrays, slices, maps, and fields
 // of structs. In maps, keys are compared with == but elements use deep

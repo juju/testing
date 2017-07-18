@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	gc "gopkg.in/check.v1"
 )
 
@@ -25,7 +27,6 @@ var IsTrue gc.Checker = &isTrueChecker{
 var IsFalse gc.Checker = gc.Not(IsTrue)
 
 func (checker *isTrueChecker) Check(params []interface{}, names []string) (result bool, error string) {
-
 	value := reflect.ValueOf(params[0])
 	if !value.IsValid() {
 		return false, fmt.Sprintf("expected type bool, received %s", value)
@@ -34,7 +35,6 @@ func (checker *isTrueChecker) Check(params []interface{}, names []string) (resul
 	case reflect.Bool:
 		return value.Bool(), ""
 	}
-
 	return false, fmt.Sprintf("expected type bool, received type %s", value.Type())
 }
 
@@ -104,14 +104,41 @@ type deepEqualsChecker struct {
 //
 // This checker differs from gocheck.DeepEquals in that
 // it will compare a nil slice equal to an empty slice,
-// and a nil map equal to an empty map.
-var DeepEquals gc.Checker = &deepEqualsChecker{
-	&gc.CheckerInfo{Name: "DeepEquals", Params: []string{"obtained", "expected"}},
-}
+// and a nil map equal to an empty map and that
+// it will panic if called upon to compare unexported fields.
+var DeepEquals = CmpEquals(cmpopts.EquateEmpty())
 
 func (checker *deepEqualsChecker) Check(params []interface{}, names []string) (result bool, error string) {
 	if ok, err := DeepEqual(params[0], params[1]); !ok {
 		return false, err.Error()
 	}
 	return true, ""
+}
+
+// CmpEquals uses cmp.Diff (see http://godoc.org/github.com/google/go-cmp/cmp#Diff)
+// to compare two values, passing opts to the comparer to enable custom
+// comparison. Passing DeepEqualsOption to CmpEquals makes it
+// behave the same as DeepEquals.
+func CmpEquals(opts ...cmp.Option) gc.Checker {
+	return &cmpEqualsChecker{
+		CheckerInfo: &gc.CheckerInfo{
+			Name:   "CmpEquals",
+			Params: []string{"obtained", "expected"},
+		},
+		check: func(params []interface{}, names []string) (result bool, error string) {
+			if diff := cmp.Diff(params[0], params[1], opts...); diff != "" {
+				return false, diff
+			}
+			return true, ""
+		},
+	}
+}
+
+type cmpEqualsChecker struct {
+	*gc.CheckerInfo
+	check func(params []interface{}, names []string) (result bool, error string)
+}
+
+func (c *cmpEqualsChecker) Check(params []interface{}, names []string) (result bool, error string) {
+	return c.check(params, names)
 }
