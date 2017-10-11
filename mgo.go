@@ -691,9 +691,7 @@ func clearNormalCollection(collection *mgo.Collection) error {
 }
 
 func clearCappedCollection(collection *mgo.Collection) error {
-	// This is a test command - relies on the enableTestCommands
-	// setting being passed to mongo at startup.
-	return collection.Database.Run(bson.D{{"emptycapped", collection.Name}}, nil)
+	return collection.DropCollection()
 }
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
