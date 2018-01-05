@@ -222,6 +222,21 @@ func (f *Stub) CheckCallNames(c *gc.C, expected ...string) bool {
 	return c.Check(funcNames, jc.DeepEquals, expected)
 }
 
+// CheckNumCalls verifies that a method name was called a specific number of
+// times.
+func (f *Stub) CheckNumCalls(c *gc.C, funcName string, callCount int) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	funcNames := stubCallNames(f.calls...)
+	var count int
+	for _, callName := range funcNames {
+		if funcName == callName {
+			count++
+		}
+	}
+	return c.Check(count, gc.Equals, callCount)
+}
+
 // CheckNoCalls verifies that none of the stub's methods have been called.
 func (f *Stub) CheckNoCalls(c *gc.C) {
 	f.CheckCalls(c, nil)

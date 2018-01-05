@@ -388,6 +388,15 @@ func (s *stubSuite) TestCheckCallNamesPass(c *gc.C) {
 	s.stub.CheckCallNames(c, "first", "second", "third")
 }
 
+func (s *stubSuite) TestCheckNumCalls(c *gc.C) {
+	callName := "TestCall"
+	callCount := 5
+	for i := 0; i < callCount; i++ {
+		s.stub.AddCall(callName)
+	}
+	s.stub.CheckNumCalls(c, callName, callCount)
+}
+
 func (s *stubSuite) TestCheckCallNamesUnexpected(c *gc.C) {
 	s.stub.AddCall("first", "arg")
 	s.stub.AddCall("second", 1, 2, 4)
