@@ -200,22 +200,23 @@ func (f *Stub) CheckCalls(c *gc.C, expected []StubCall) {
 // This method explicitly does not check if the calls were made in order, just
 // whether they have been made.
 func (f *Stub) CheckCallsUnordered(c *gc.C, expected []StubCall) {
-	c.Check(len(f.calls), gc.Equals, len(expected))
-	callWasMade := func(call StubCall) bool {
-		for _, madeCall := range f.calls {
+	// Take a copy of all calls made to the stub.
+	calls := f.calls[:]
+	checkCallMade := func(call StubCall) {
+		for i, madeCall := range calls {
 			if reflect.DeepEqual(call, madeCall) {
-				return true
+				// Remove found call from the copy of all-calls-made collection.
+				calls = append(calls[:i], calls[i+1:]...)
+				break
 			}
 		}
-		c.Logf("call [%v] was never made", call)
-		return false
 	}
 
 	for _, call := range expected {
-		if !callWasMade(call) {
-			c.Fail()
-		}
+		checkCallMade(call)
 	}
+	// If all expected calls were made, our resulting collection should be empty.
+	c.Check(calls, gc.DeepEquals, []StubCall{})
 }
 
 // CheckCall checks the recorded call at the given index against the

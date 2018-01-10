@@ -446,3 +446,25 @@ func (s *stubSuite) TestMethodCallsUnordered(c *gc.C) {
 		FuncName: "Method2",
 	}})
 }
+
+// This case checks that in the scenario when expected calls are
+// [a,b,c,c] but the calls made are actually [a,b,b,c], we fail correctly.
+func (s *stubSuite) TestMethodCallsUnorderedDuplicateFail(c *gc.C) {
+	s.stub.MethodCall(s.stub, "Method1", 1, 2, 3)
+	s.stub.MethodCall(s.stub, "Method1", 1, 2, 3)
+	s.stub.AddCall("aFunc", "arg")
+	s.stub.MethodCall(s.stub, "Method2")
+
+	s.stub.CheckCallsUnordered(c, []testing.StubCall{{
+		FuncName: "aFunc",
+		Args:     []interface{}{"arg"},
+	}, {
+		FuncName: "Method1",
+		Args:     []interface{}{1, 2, 3},
+	}, {
+		FuncName: "Method2",
+	}, {
+		FuncName: "Method2",
+	}})
+	c.ExpectFailure("should have failed as expected calls differ from calls made")
+}
