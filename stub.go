@@ -9,6 +9,7 @@ import (
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"reflect"
 )
 
 // StubCall records the name of a called function and the passed args.
@@ -191,6 +192,30 @@ func (f *Stub) CheckCalls(c *gc.C, expected []StubCall) {
 		return
 	}
 	c.Check(f.calls, jc.DeepEquals, expected)
+}
+
+// CheckCallsUnordered verifies that the history of calls on the stub's methods
+// contains the expected calls. The receivers are not checked. If they
+// are significant then check Stub.Receivers separately.
+// This method explicitly does not check if the calls were made in order, just
+// whether they have been made.
+func (f *Stub) CheckCallsUnordered(c *gc.C, expected []StubCall) {
+	c.Check(len(f.calls), gc.Equals, len(expected))
+	callWasMade := func(call StubCall) bool {
+		for _, madeCall := range f.calls {
+			if reflect.DeepEqual(call, madeCall) {
+				return true
+			}
+		}
+		c.Logf("call [%v] was never made", call)
+		return false
+	}
+
+	for _, call := range expected {
+		if !callWasMade(call) {
+			c.Fail()
+		}
+	}
 }
 
 // CheckCall checks the recorded call at the given index against the

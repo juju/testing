@@ -430,3 +430,19 @@ func (s *stubSuite) TestCheckNoCalls(c *gc.C) {
 	c.ExpectFailure(`the "standard" Stub.CheckNoCalls call should fail here`)
 	s.stub.CheckNoCalls(c)
 }
+
+func (s *stubSuite) TestMethodCallsUnordered(c *gc.C) {
+	s.stub.MethodCall(s.stub, "Method1", 1, 2, 3)
+	s.stub.AddCall("aFunc", "arg")
+	s.stub.MethodCall(s.stub, "Method2")
+
+	s.stub.CheckCallsUnordered(c, []testing.StubCall{{
+		FuncName: "aFunc",
+		Args:     []interface{}{"arg"},
+	}, {
+		FuncName: "Method1",
+		Args:     []interface{}{1, 2, 3},
+	}, {
+		FuncName: "Method2",
+	}})
+}
