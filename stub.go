@@ -5,11 +5,11 @@ package testing
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"reflect"
 )
 
 // StubCall records the name of a called function and the passed args.
