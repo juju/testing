@@ -64,12 +64,6 @@ const (
 
 	// The default password to use when connecting to the mongo database.
 	DefaultMongoPassword = "conn-from-name-secret"
-
-	// defaultMongoStorageEngine is the default storage engine to use
-	// in Mongo 3.2 onwards for tests. We default to mmapv1 (vs. the
-	// mongo default of wiredTiger) for the best performance in tests,
-	// but make it configurable.
-	defaultMongoStorageEngine = "mmapv1"
 )
 
 // Certs holds the certificates and keys required to make a secure
@@ -267,11 +261,10 @@ func (inst *MgoInstance) run() error {
 		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if version.Compare(storageEngineMongoVersion) >= 0 {
-		storageEngine := os.Getenv("JUJU_MONGO_STORAGE_ENGINE")
-		if storageEngine == "" {
-			storageEngine = defaultMongoStorageEngine
+		storageEngine := mongoStorageEngine()
+		if storageEngine != "" {
+			mgoargs = append(mgoargs, "--storageEngine", storageEngine)
 		}
-		mgoargs = append(mgoargs, "--storageEngine", storageEngine)
 	}
 
 	if inst.Params != nil {
@@ -337,6 +330,21 @@ func (inst *MgoInstance) run() error {
 	inst.server = server
 
 	return nil
+}
+
+func mongoStorageEngine() string {
+	storageEngine := os.Getenv("JUJU_MONGO_STORAGE_ENGINE")
+	if storageEngine != "" {
+		return storageEngine
+	}
+	switch runtime.GOARCH {
+	case "386", "amd64":
+		// On x86(_64), mmapv1 should always be available. If not
+		// overridden via the environment variable above, we use
+		// mmapv1 by default for the best performance in tests.
+		return "mmapv1"
+	}
+	return "" // use the default
 }
 
 // mongodCache looks up mongod path and version and caches the result.
