@@ -5,6 +5,7 @@ package testing
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	jc "github.com/juju/testing/checkers"
@@ -191,6 +192,31 @@ func (f *Stub) CheckCalls(c *gc.C, expected []StubCall) {
 		return
 	}
 	c.Check(f.calls, jc.DeepEquals, expected)
+}
+
+// CheckCallsUnordered verifies that the history of calls on the stub's methods
+// contains the expected calls. The receivers are not checked. If they
+// are significant then check Stub.Receivers separately.
+// This method explicitly does not check if the calls were made in order, just
+// whether they have been made.
+func (f *Stub) CheckCallsUnordered(c *gc.C, expected []StubCall) {
+	// Take a copy of all calls made to the stub.
+	calls := f.calls[:]
+	checkCallMade := func(call StubCall) {
+		for i, madeCall := range calls {
+			if reflect.DeepEqual(call, madeCall) {
+				// Remove found call from the copy of all-calls-made collection.
+				calls = append(calls[:i], calls[i+1:]...)
+				break
+			}
+		}
+	}
+
+	for _, call := range expected {
+		checkCallMade(call)
+	}
+	// If all expected calls were made, our resulting collection should be empty.
+	c.Check(calls, gc.DeepEquals, []StubCall{})
 }
 
 // CheckCall checks the recorded call at the given index against the
