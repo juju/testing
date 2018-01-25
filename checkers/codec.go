@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/juju/mgo/bson"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v2"
 )
 
