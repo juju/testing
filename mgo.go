@@ -659,6 +659,11 @@ func clearCollections(db *mgo.Database) error {
 		if strings.HasPrefix(name, "system.") {
 			continue
 		}
+		if name == "oplog.rs" && db.Name == "local" {
+			// 3.4 prevents you from deleting your local replicaset information
+			// while part of a replica. Arguably it was never safe to do.
+			continue
+		}
 		collection := db.C(name)
 		clearFunc := clearNormalCollection
 		capped, err := isCapped(collection)
