@@ -1,6 +1,6 @@
 default: check
 
 check:
-	go test ./... && go test ./... -compiler gccgo
+	go test ./...
 
 .PHONY: default check 
