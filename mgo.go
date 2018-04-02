@@ -230,7 +230,6 @@ func (inst *MgoInstance) run() error {
 		"--nssize", "1",
 		"--noprealloc",
 		"--smallfiles",
-		"--nohttpinterface",
 		"--oplogSize", "10",
 		"--ipv6",
 		"--setParameter", "enableTestCommands=1",
@@ -744,7 +743,7 @@ func (inst *MgoInstance) Reset() error {
 	logger.Infof("reset successfully reset admin password")
 	for _, name := range dbnames {
 		switch name {
-		case "local", "config":
+		case "local", "config", "admin":
 			// don't delete these
 			continue
 		}
