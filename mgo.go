@@ -354,6 +354,11 @@ type mongodCache struct {
 	done    bool
 }
 
+func MongodVersion() (version.Number, error) {
+	_, v, err := installedMongod.Get()
+	return v, err
+}
+
 func (cache *mongodCache) Get() (string, version.Number, error) {
 	cache.Lock()
 	defer cache.Unlock()
