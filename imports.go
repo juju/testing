@@ -6,6 +6,7 @@ package testing
 import (
 	"fmt"
 	"go/build"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -155,7 +156,7 @@ var stdlib = map[string]bool{
 // removes the common prefix, leaving just the short names.
 func FindImports(packageName, prefix string) ([]string, error) {
 	allPkgs := make(map[string]bool)
-	if err := findImports(packageName, allPkgs); err != nil {
+	if err := findImports(packageName, allPkgs, findProjectDir(prefix)); err != nil {
 		return nil, err
 	}
 	var result []string
@@ -168,21 +169,25 @@ func FindImports(packageName, prefix string) ([]string, error) {
 	return result, nil
 }
 
+func findProjectDir(projectPath string) string {
+	return filepath.Join(build.Default.GOPATH, "src", projectPath)
+}
+
 // findImports recursively adds all imported packages of given
 // package (packageName) to allPkgs map.
-func findImports(packageName string, allPkgs map[string]bool) error {
+func findImports(packageName string, allPkgs map[string]bool, srcDir string) error {
 	// skip packages defined in the standard library.
 	if stdlib[packageName] {
 		return nil
 	}
-	pkg, err := build.Default.Import(packageName, "", 0)
+	pkg, err := build.Default.Import(packageName, srcDir, 0)
 	if err != nil {
 		return fmt.Errorf("cannot find %q: %v", packageName, err)
 	}
 	for _, name := range pkg.Imports {
 		if !allPkgs[name] {
 			allPkgs[name] = true
-			if err := findImports(name, allPkgs); err != nil {
+			if err := findImports(name, allPkgs, srcDir); err != nil {
 				return err
 			}
 		}
