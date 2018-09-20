@@ -387,6 +387,7 @@ func getMongod() (string, error) {
 		"/usr/lib/juju/mongo3.2/bin/mongod",
 		"mongod",
 		"/usr/lib/juju/bin/mongod",
+		"/usr/bin/mongod",       // bionic
 		"/usr/local/bin/mongod", // Needed on CentOS where $PATH is being completely removed
 	)
 	var err error
