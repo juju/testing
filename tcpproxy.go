@@ -44,7 +44,7 @@ func NewTCPProxy(c *gc.C, remoteAddr string) *TCPProxy {
 			client, err := p.listener.Accept()
 			if err != nil {
 				if !p.isClosed() {
-					c.Error("cannot accept: %v", err)
+					c.Errorf("cannot accept: %v", err)
 				}
 				return
 			}
@@ -52,7 +52,7 @@ func NewTCPProxy(c *gc.C, remoteAddr string) *TCPProxy {
 			server, err := net.Dial("tcp", remoteAddr)
 			if err != nil {
 				if !p.isClosed() {
-					c.Error("cannot dial remote address: %v", err)
+					c.Errorf("cannot dial remote address: %v", err)
 				}
 				return
 			}
