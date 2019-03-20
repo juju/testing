@@ -233,6 +233,7 @@ func (inst *MgoInstance) run() error {
 		"--oplogSize", "10",
 		"--ipv6",
 		"--setParameter", "enableTestCommands=1",
+		"--replSet=juju",
 	}
 	if runtime.GOOS != "windows" {
 		mgoargs = append(mgoargs, "--nounixsocket")
@@ -327,6 +328,13 @@ func (inst *MgoInstance) run() error {
 		return err
 	}
 	inst.server = server
+	session := inst.MustDialDirect()
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	fmt.Fprintf(os.Stderr, "*********  running replSetInitiate\n\n")
+	if err := session.Run(bson.D{{"replSetInitiate", nil}}, nil); err != nil {
+		panic(err)
+	}
 
 	return nil
 }
@@ -337,11 +345,11 @@ func mongoStorageEngine() string {
 		return storageEngine
 	}
 	switch runtime.GOARCH {
-	case "386", "amd64":
+	case "amd64":
 		// On x86(_64), mmapv1 should always be available. If not
 		// overridden via the environment variable above, we use
 		// mmapv1 by default for the best performance in tests.
-		return "mmapv1"
+		return "wiredTiger"
 	}
 	return "" // use the default
 }
