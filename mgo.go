@@ -331,7 +331,6 @@ func (inst *MgoInstance) run() error {
 	session := inst.MustDialDirect()
 	defer session.Close()
 	session.SetMode(mgo.Monotonic, true)
-	fmt.Fprintf(os.Stderr, "*********  running replSetInitiate\n\n")
 	if err := session.Run(bson.D{{"replSetInitiate", nil}}, nil); err != nil {
 		panic(err)
 	}
@@ -651,8 +650,12 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 
 func clearDatabases(session *mgo.Session) error {
 	databases, err := session.DatabaseNames()
+	if err != nil && err.Error() == "EOF" {
+		session.Refresh()
+		databases, err = session.DatabaseNames()
+	}
 	if err != nil {
-		return errors.Trace(err)
+		return errors.Annotate(err, "failed to list database names")
 	}
 	for _, name := range databases {
 		err = clearCollections(session.DB(name))
