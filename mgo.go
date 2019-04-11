@@ -102,6 +102,10 @@ type MgoInstance struct {
 	// the mongod application
 	Params []string
 
+	// EnableReplicaSet will pass the right parameters to --replSet and call
+	// replSetInitiate when appropriate.
+	EnableReplicaSet bool
+
 	// EnableAuth enables authentication/authorization.
 	EnableAuth bool
 
@@ -233,7 +237,10 @@ func (inst *MgoInstance) run() error {
 		"--oplogSize", "10",
 		"--ipv6",
 		"--setParameter", "enableTestCommands=1",
-		"--replSet=juju",
+		// You can set this if you want to see all queries that are
+		// being run against Mongodb. We don't enable it by default
+		// because it ends up being very chatty.
+		// "--setParameter", "logComponentVerbosity={verbosity:1}",
 	}
 	if runtime.GOOS != "windows" {
 		mgoargs = append(mgoargs, "--nounixsocket")
@@ -243,6 +250,9 @@ func (inst *MgoInstance) run() error {
 			"--auth",
 			"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		)
+	}
+	if inst.EnableReplicaSet {
+		mgoargs = append(mgoargs,"--replSet=juju")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
@@ -328,13 +338,16 @@ func (inst *MgoInstance) run() error {
 		return err
 	}
 	inst.server = server
-	session := inst.MustDialDirect()
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	if err := session.Run(bson.D{{"replSetInitiate", nil}}, nil); err != nil {
-		panic(err)
+	if inst.EnableReplicaSet {
+		session := inst.MustDialDirect()
+		defer session.Close()
+		session.SetMode(mgo.Monotonic, true)
+		var res bson.M
+		if err := session.Run(bson.D{{"replSetInitiate", nil}}, &res); err != nil {
+			return err
+		}
+		logger.Debugf("mongodb initializing replicaset returned: %v", res)
 	}
-
 	return nil
 }
 
@@ -658,6 +671,13 @@ func clearDatabases(session *mgo.Session) error {
 		return errors.Annotate(err, "failed to list database names")
 	}
 	for _, name := range databases {
+		if name == "local" || name == "config" {
+			// local has lots of things like oplog.rs or
+			// replset.*
+			// config contains things like config.transactions
+			// none of those are safe to delete.
+			continue
+		}
 		err = clearCollections(session.DB(name))
 		if err != nil {
 			return errors.Trace(err)
@@ -673,11 +693,6 @@ func clearCollections(db *mgo.Database) error {
 	}
 	for _, name := range collectionNames {
 		if strings.HasPrefix(name, "system.") {
-			continue
-		}
-		if name == "oplog.rs" && db.Name == "local" {
-			// 3.4 prevents you from deleting your local replicaset information
-			// while part of a replica. Arguably it was never safe to do.
 			continue
 		}
 		collection := db.C(name)
