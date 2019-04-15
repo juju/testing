@@ -46,10 +46,12 @@ func (s *mgoSuite) TestResetWhenUnauthorized(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	defer session.Close()
 	err = session.DB("admin").AddUser("admin", "foo", false)
+	c.Logf("Adding user resulted in: %v", err)
 	if err != nil && err.Error() != "need to login" {
 		c.Assert(err, gc.IsNil)
 	}
 	// The test will fail if the reset does not succeed
+	testing.MgoServer.Reset()
 }
 
 func (s *mgoSuite) TestStartAndClean(c *gc.C) {
@@ -94,5 +96,5 @@ func (s *mgoSuite) TestNewProxiedSession(c *gc.C) {
 	session.CloseConns()
 	err = session.Ping()
 	// There's no consistent error in this case.
-	c.Assert(err, gc.Not(gc.Equals), nil)
+	c.Assert(err, gc.NotNil)
 }

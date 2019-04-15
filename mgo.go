@@ -102,6 +102,10 @@ type MgoInstance struct {
 	// the mongod application
 	Params []string
 
+	// EnableReplicaSet will pass the right parameters to --replSet and call
+	// replSetInitiate when appropriate.
+	EnableReplicaSet bool
+
 	// EnableAuth enables authentication/authorization.
 	EnableAuth bool
 
@@ -233,6 +237,10 @@ func (inst *MgoInstance) run() error {
 		"--oplogSize", "10",
 		"--ipv6",
 		"--setParameter", "enableTestCommands=1",
+		// You can set this if you want to see all queries that are
+		// being run against Mongodb. We don't enable it by default
+		// because it ends up being very chatty.
+		// "--setParameter", "logComponentVerbosity={verbosity:1}",
 	}
 	if runtime.GOOS != "windows" {
 		mgoargs = append(mgoargs, "--nounixsocket")
@@ -242,6 +250,9 @@ func (inst *MgoInstance) run() error {
 			"--auth",
 			"--keyFile", filepath.Join(inst.dir, "keyfile"),
 		)
+	}
+	if inst.EnableReplicaSet {
+		mgoargs = append(mgoargs,"--replSet=juju")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
@@ -327,7 +338,16 @@ func (inst *MgoInstance) run() error {
 		return err
 	}
 	inst.server = server
-
+	if inst.EnableReplicaSet {
+		session := inst.MustDialDirect()
+		defer session.Close()
+		session.SetMode(mgo.Monotonic, true)
+		var res bson.M
+		if err := session.Run(bson.D{{"replSetInitiate", nil}}, &res); err != nil {
+			return err
+		}
+		logger.Debugf("mongodb initializing replicaset returned: %v", res)
+	}
 	return nil
 }
 
@@ -337,11 +357,12 @@ func mongoStorageEngine() string {
 		return storageEngine
 	}
 	switch runtime.GOARCH {
-	case "386", "amd64":
-		// On x86(_64), mmapv1 should always be available. If not
-		// overridden via the environment variable above, we use
-		// mmapv1 by default for the best performance in tests.
-		return "mmapv1"
+	case "amd64":
+                // Use 'wiredTiger' unless explicitly requested to use a
+                // different backend.  mmapv1 is generally available, but
+                // doesn't support things like server-side transactions, and
+                // also isn't our production backend.
+		return "wiredTiger"
 	}
 	return "" // use the default
 }
@@ -644,9 +665,16 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 func clearDatabases(session *mgo.Session) error {
 	databases, err := session.DatabaseNames()
 	if err != nil {
-		return errors.Trace(err)
+		return errors.Annotate(err, "failed to list database names")
 	}
 	for _, name := range databases {
+		if name == "local" || name == "config" {
+			// local has lots of things like oplog.rs or
+			// replset.*
+			// config contains things like config.transactions
+			// none of those are safe to delete.
+			continue
+		}
 		err = clearCollections(session.DB(name))
 		if err != nil {
 			return errors.Trace(err)
@@ -662,11 +690,6 @@ func clearCollections(db *mgo.Database) error {
 	}
 	for _, name := range collectionNames {
 		if strings.HasPrefix(name, "system.") {
-			continue
-		}
-		if name == "oplog.rs" && db.Name == "local" {
-			// 3.4 prevents you from deleting your local replicaset information
-			// while part of a replica. Arguably it was never safe to do.
 			continue
 		}
 		collection := db.C(name)
