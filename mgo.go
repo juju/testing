@@ -358,9 +358,10 @@ func mongoStorageEngine() string {
 	}
 	switch runtime.GOARCH {
 	case "amd64":
-		// On x86(_64), mmapv1 should always be available. If not
-		// overridden via the environment variable above, we use
-		// mmapv1 by default for the best performance in tests.
+                // Use 'wiredTiger' unless explicitly requested to use a
+                // different backend.  mmapv1 is generally available, but
+                // doesn't support things like server-side transactions, and
+                // also isn't our production backend.
 		return "wiredTiger"
 	}
 	return "" // use the default
@@ -663,10 +664,6 @@ func MgoDialInfo(certs *Certs, addrs ...string) *mgo.DialInfo {
 
 func clearDatabases(session *mgo.Session) error {
 	databases, err := session.DatabaseNames()
-	if err != nil && err.Error() == "EOF" {
-		session.Refresh()
-		databases, err = session.DatabaseNames()
-	}
 	if err != nil {
 		return errors.Annotate(err, "failed to list database names")
 	}
