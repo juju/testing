@@ -271,7 +271,7 @@ func (inst *MgoInstance) run() error {
 		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if version.Compare(storageEngineMongoVersion) >= 0 {
-		storageEngine := mongoStorageEngine()
+		storageEngine := mongoStorageEngine(inst.EnableReplicaSet)
 		if storageEngine != "" {
 			mgoargs = append(mgoargs, "--storageEngine", storageEngine)
 		}
@@ -351,18 +351,23 @@ func (inst *MgoInstance) run() error {
 	return nil
 }
 
-func mongoStorageEngine() string {
+func mongoStorageEngine(replicaset bool) string {
 	storageEngine := os.Getenv("JUJU_MONGO_STORAGE_ENGINE")
 	if storageEngine != "" {
 		return storageEngine
 	}
 	switch runtime.GOARCH {
 	case "amd64":
+            if replicaset {
                 // Use 'wiredTiger' unless explicitly requested to use a
                 // different backend.  mmapv1 is generally available, but
                 // doesn't support things like server-side transactions, and
                 // also isn't our production backend.
 		return "wiredTiger"
+            } else {
+                // We use mmapv1 in the test suite as it can be 3-4x faster in many tests.
+                return "mmapv1"
+            }
 	}
 	return "" // use the default
 }
