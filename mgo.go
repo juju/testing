@@ -384,6 +384,7 @@ func getMongod() (string, error) {
 		paths = append(paths, path)
 	}
 	paths = append(paths,
+		"/snap/juju-db/current/bin/monogod",
 		"/usr/lib/juju/mongo3.2/bin/mongod",
 		"mongod",
 		"/usr/lib/juju/bin/mongod",
