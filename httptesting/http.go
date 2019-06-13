@@ -165,6 +165,10 @@ type DoRequestParams struct {
 	// nil.
 	ExpectError string
 
+	// ExpectStatus holds the expected HTTP status code.
+	// If unset or zero, then no check is performed.
+	ExpectStatus int
+
 	// Method holds the HTTP method to use for the call.
 	// GET is assumed if this is empty.
 	Method string
@@ -276,6 +280,9 @@ func Do(c *gc.C, p DoRequestParams) *http.Response {
 		return nil
 	}
 	c.Assert(err, jc.ErrorIsNil)
+	if p.ExpectStatus != 0 {
+		c.Assert(resp.StatusCode, gc.Equals, p.ExpectStatus)
+	}
 	return resp
 }
 
