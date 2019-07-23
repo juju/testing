@@ -283,7 +283,7 @@ func Do(c *gc.C, p DoRequestParams) *http.Response {
 	// where prior to go version 1.12 if you try and access HTTPS from a HTTP
 	// end point you recieved garbage back. In go version 1.12 and higher, the
 	// status code of 400 is returned. The issue with this is that we should
-	// handle bother go version <1.11 and go >=1.12 in the same way. Juju
+	// handle both go version <1.11 and go >=1.12 in the same way. Juju
 	// shouldn't have to know about the idiosyncrasies of the go runtime.
 	malformed := malformedError(err)
 	if err != nil && !malformed {
