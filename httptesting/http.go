@@ -279,11 +279,31 @@ func Do(c *gc.C, p DoRequestParams) *http.Response {
 		c.Assert(err, gc.ErrorMatches, p.ExpectError)
 		return nil
 	}
-	c.Assert(err, jc.ErrorIsNil)
+	// malformed error check here is required to ensure that we handle cases
+	// where prior to go version 1.12 if you try and access HTTPS from a HTTP
+	// end point you recieved garbage back. In go version 1.12 and higher, the
+	// status code of 400 is returned. The issue with this is that we should
+	// handle both go version <1.11 and go >=1.12 in the same way. Juju
+	// shouldn't have to know about the idiosyncrasies of the go runtime.
+	malformed := malformedError(err)
+	if err != nil && !malformed {
+		c.Assert(err, jc.ErrorIsNil)
+	}
 	if p.ExpectStatus != 0 {
-		c.Assert(resp.StatusCode, gc.Equals, p.ExpectStatus)
+		statusCode := http.StatusBadRequest
+		if !malformed {
+			statusCode = resp.StatusCode
+		}
+		c.Assert(statusCode, gc.Equals, p.ExpectStatus)
 	}
 	return resp
+}
+
+func malformedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "transport connection broken: malformed HTTP response")
 }
 
 // bodyContentLength returns the Content-Length
