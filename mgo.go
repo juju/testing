@@ -252,7 +252,7 @@ func (inst *MgoInstance) run() error {
 		)
 	}
 	if inst.EnableReplicaSet {
-		mgoargs = append(mgoargs,"--replSet=juju")
+		mgoargs = append(mgoargs, "--replSet=juju")
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
@@ -306,7 +306,7 @@ func (inst *MgoInstance) run() error {
 			listening <- nil
 		} else {
 			err := fmt.Errorf("mongod failed to listen on port %v", mgoport)
-			if strings.Contains(buf.String(), "addr already in use") {
+			if strings.Contains(buf.String(), "already in use") {
 				err = addrAlreadyInUseError{err}
 			}
 			listening <- err
@@ -358,16 +358,16 @@ func mongoStorageEngine(replicaset bool) string {
 	}
 	switch runtime.GOARCH {
 	case "amd64":
-            if replicaset {
-                // Use 'wiredTiger' unless explicitly requested to use a
-                // different backend.  mmapv1 is generally available, but
-                // doesn't support things like server-side transactions, and
-                // also isn't our production backend.
-		return "wiredTiger"
-            } else {
-                // We use mmapv1 in the test suite as it can be 3-4x faster in many tests.
-                return "mmapv1"
-            }
+		if replicaset {
+			// Use 'wiredTiger' unless explicitly requested to use a
+			// different backend.  mmapv1 is generally available, but
+			// doesn't support things like server-side transactions, and
+			// also isn't our production backend.
+			return "wiredTiger"
+		} else {
+			// We use mmapv1 in the test suite as it can be 3-4x faster in many tests.
+			return "mmapv1"
+		}
 	}
 	return "" // use the default
 }
