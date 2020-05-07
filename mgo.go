@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -173,10 +174,38 @@ func generatePEM(path string, serverCert *x509.Certificate, serverKey *rsa.Priva
 
 // Start starts a MongoDB server in a temporary directory.
 func (inst *MgoInstance) Start(certs *Certs) error {
-	dbdir, err := ioutil.TempDir("", "test-mgo")
+	var err error
+	mongopath, _, err := installedMongod.Get()
 	if err != nil {
 		return err
 	}
+
+	dbdir := ""
+
+	// Check for snap confined mongod.
+	if mongopath == "/snap/bin/juju-db.mongod" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		base := path.Join(home, "snap/juju-db/current/tmp")
+		err = os.Mkdir(base, 0755)
+		if os.IsExist(err) {
+			// do nothing
+		} else if err != nil {
+			return err
+		}
+		dbdir, err = ioutil.TempDir(base, "test-mgo")
+		if err != nil {
+			return errors.Annotatef(err, "failed to make directory for confined juju-db snap")
+		}
+	} else {
+		dbdir, err = ioutil.TempDir("", "test-mgo")
+		if err != nil {
+			return err
+		}
+	}
+
 	logger.Debugf("starting mongo in %s", dbdir)
 
 	// Give them all the same keyfile so they can talk appropriately.
@@ -410,7 +439,7 @@ func getMongod() (string, error) {
 		paths = append(paths, path)
 	}
 	paths = append(paths,
-		"/snap/juju-db/current/bin/monogod",
+		"/snap/bin/juju-db.mongod",
 		"/usr/lib/juju/mongo3.2/bin/mongod",
 		"mongod",
 		"/usr/lib/juju/bin/mongod",
