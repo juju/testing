@@ -57,6 +57,8 @@ var (
 	storageEngineMongoVersion = mongo32
 
 	installedMongod mongodCache
+
+	homeDir string
 )
 
 const (
@@ -66,6 +68,12 @@ const (
 	// The default password to use when connecting to the mongo database.
 	DefaultMongoPassword = "conn-from-name-secret"
 )
+
+func init() {
+	// Some juju test suites overwrite env vars.
+	// When we stop doing that, we can move this.
+	homeDir, _ = os.UserHomeDir()
+}
 
 // Certs holds the certificates and keys required to make a secure
 // SSL connection.
@@ -184,11 +192,7 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 
 	// Check for snap confined mongod.
 	if mongopath == "/snap/bin/juju-db.mongod" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		base := path.Join(home, "snap/juju-db/current/tmp")
+		base := path.Join(homeDir, "snap/juju-db/current/tmp")
 		err = os.Mkdir(base, 0755)
 		if os.IsExist(err) {
 			// do nothing
@@ -438,8 +442,14 @@ func getMongod() (string, error) {
 	if path := os.Getenv("JUJU_MONGOD"); path != "" {
 		paths = append(paths, path)
 	}
+
+	if homeDir == "" {
+		logger.Debugf("no home directory found, skipping /snap/bin/juju-db.mongod")
+	} else {
+		paths = append(paths, "/snap/bin/juju-db.mongod")
+	}
+
 	paths = append(paths,
-		"/snap/bin/juju-db.mongod",
 		"/usr/lib/juju/mongo3.2/bin/mongod",
 		"mongod",
 		"/usr/lib/juju/bin/mongod",
