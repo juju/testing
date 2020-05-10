@@ -57,8 +57,6 @@ var (
 	storageEngineMongoVersion = mongo32
 
 	installedMongod mongodCache
-
-	homeDir string
 )
 
 const (
@@ -68,12 +66,6 @@ const (
 	// The default password to use when connecting to the mongo database.
 	DefaultMongoPassword = "conn-from-name-secret"
 )
-
-func init() {
-	// Some juju test suites overwrite env vars.
-	// When we stop doing that, we can move this.
-	homeDir, _ = os.UserHomeDir()
-}
 
 // Certs holds the certificates and keys required to make a secure
 // SSL connection.
@@ -180,6 +172,32 @@ func generatePEM(path string, serverCert *x509.Certificate, serverKey *rsa.Priva
 	return nil
 }
 
+// getHome for robust detection of HOME directory for use on Linux with
+// snaps.
+func getHome() (string, error) {
+	targetUID := strconv.Itoa(os.Getuid())
+	passwd, err := ioutil.ReadFile("/etc/passwd")
+	if err != nil {
+		return "", errors.Trace(err)
+	}
+	lines := strings.Split(string(passwd), "\n")
+	for _, line := range lines {
+		passwdEntry := strings.Split(line, ":")
+		if len(passwdEntry) != 7 {
+			// Invalid passwd entry.
+			continue
+		}
+		uidEntry := passwdEntry[2]
+		if uidEntry != targetUID {
+			// Not the user we are looking for.
+			continue
+		}
+		home := passwdEntry[5]
+		return home, nil
+	}
+	return "", errors.NotFoundf("UNIX user %s", targetUID)
+}
+
 // Start starts a MongoDB server in a temporary directory.
 func (inst *MgoInstance) Start(certs *Certs) error {
 	var err error
@@ -191,8 +209,12 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 	dbdir := ""
 
 	// Check for snap confined mongod.
-	if mongopath == "/snap/bin/juju-db.mongod" {
-		base := path.Join(homeDir, "snap/juju-db/current/tmp")
+	if runtime.GOOS == "linux" && mongopath == "/snap/bin/juju-db.mongod" {
+		home, err := getHome()
+		if err != nil {
+			return errors.Annotatef(err, "failed to find HOME directory")
+		}
+		base := path.Join(home, "snap/juju-db/current/tmp")
 		err = os.Mkdir(base, 0755)
 		if os.IsExist(err) {
 			// do nothing
@@ -443,9 +465,8 @@ func getMongod() (string, error) {
 		paths = append(paths, path)
 	}
 
-	if homeDir == "" {
-		logger.Debugf("no home directory found, skipping /snap/bin/juju-db.mongod")
-	} else {
+	if runtime.GOOS == "linux" {
+		// Snaps are only supported on linux for now.
 		paths = append(paths, "/snap/bin/juju-db.mongod")
 	}
 
