@@ -53,7 +53,7 @@ func printable(v reflect.Value) interface{} {
 // Tests for deep equality using reflected types. The map argument tracks
 // comparisons that have already been seen, which allows short circuiting on
 // recursive types.
-func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, depth int) (ok bool, err error) {
+func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, depth int, customCheckFunc CustomCheckFunc) (ok bool, err error) {
 	errorf := func(f string, a ...interface{}) error {
 		return &mismatchError{
 			v1:   v1,
@@ -105,6 +105,13 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 		visited[v] = true
 	}
 
+	if customCheckFunc != nil && v1.CanInterface() && v2.CanInterface() {
+		useDefault, equal, err := customCheckFunc(path, v1.Interface(), v2.Interface())
+		if !useDefault {
+			return equal, err
+		}
+	}
+
 	switch v1.Kind() {
 	case reflect.Array:
 		if v1.Len() != v2.Len() {
@@ -114,7 +121,7 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 		for i := 0; i < v1.Len(); i++ {
 			if ok, err := deepValueEqual(
 				fmt.Sprintf("%s[%d]", path, i),
-				v1.Index(i), v2.Index(i), visited, depth+1); !ok {
+				v1.Index(i), v2.Index(i), visited, depth+1, customCheckFunc); !ok {
 				return false, err
 			}
 		}
@@ -130,7 +137,7 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 		for i := 0; i < v1.Len(); i++ {
 			if ok, err := deepValueEqual(
 				fmt.Sprintf("%s[%d]", path, i),
-				v1.Index(i), v2.Index(i), visited, depth+1); !ok {
+				v1.Index(i), v2.Index(i), visited, depth+1, customCheckFunc); !ok {
 				return false, err
 			}
 		}
@@ -142,9 +149,9 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 			}
 			return true, nil
 		}
-		return deepValueEqual(path, v1.Elem(), v2.Elem(), visited, depth+1)
+		return deepValueEqual(path, v1.Elem(), v2.Elem(), visited, depth+1, customCheckFunc)
 	case reflect.Ptr:
-		return deepValueEqual("(*"+path+")", v1.Elem(), v2.Elem(), visited, depth+1)
+		return deepValueEqual("(*"+path+")", v1.Elem(), v2.Elem(), visited, depth+1, customCheckFunc)
 	case reflect.Struct:
 		if v1.Type() == timeType {
 			// Special case for time - we ignore the time zone.
@@ -157,7 +164,7 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 		}
 		for i, n := 0, v1.NumField(); i < n; i++ {
 			path := path + "." + v1.Type().Field(i).Name
-			if ok, err := deepValueEqual(path, v1.Field(i), v2.Field(i), visited, depth+1); !ok {
+			if ok, err := deepValueEqual(path, v1.Field(i), v2.Field(i), visited, depth+1, customCheckFunc); !ok {
 				return false, err
 			}
 		}
@@ -179,7 +186,7 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 			} else {
 				p = path + "[someKey]"
 			}
-			if ok, err := deepValueEqual(p, v1.MapIndex(k), v2.MapIndex(k), visited, depth+1); !ok {
+			if ok, err := deepValueEqual(p, v1.MapIndex(k), v2.MapIndex(k), visited, depth+1, customCheckFunc); !ok {
 				return false, err
 			}
 		}
@@ -263,8 +270,52 @@ func DeepEqual(a1, a2 interface{}) (bool, error) {
 	if v1.Type() != v2.Type() {
 		return false, errorf("type mismatch %s vs %s", v1.Type(), v2.Type())
 	}
-	return deepValueEqual("", v1, v2, make(map[visit]bool), 0)
+	return deepValueEqual("", v1, v2, make(map[visit]bool), 0, nil)
 }
+
+// DeepEqualWithCustomCheck tests for deep equality. It uses normal == equality where
+// possible but will scan elements of arrays, slices, maps, and fields
+// of structs. In maps, keys are compared with == but elements use deep
+// equality. DeepEqual correctly handles recursive types. Functions are
+// equal only if they are both nil.
+//
+// DeepEqual differs from reflect.DeepEqual in two ways:
+// - an empty slice is considered equal to a nil slice.
+// - two time.Time values that represent the same instant
+// but with different time zones are considered equal.
+//
+// If the two values compare unequal, the resulting error holds the
+// first difference encountered.
+//
+// If both values are interface-able and customCheckFunc is non nil,
+// customCheckFunc will be invoked. If it returns useDefault as true, the
+// DeepEqual continues, otherwise the result of the customCheckFunc is used.
+func DeepEqualWithCustomCheck(a1 interface{}, a2 interface{}, customCheckFunc CustomCheckFunc) (bool, error) {
+	errorf := func(f string, a ...interface{}) error {
+		return &mismatchError{
+			v1:   reflect.ValueOf(a1),
+			v2:   reflect.ValueOf(a2),
+			path: "",
+			how:  fmt.Sprintf(f, a...),
+		}
+	}
+	if a1 == nil || a2 == nil {
+		if a1 == a2 {
+			return true, nil
+		}
+		return false, errorf("nil vs non-nil mismatch")
+	}
+	v1 := reflect.ValueOf(a1)
+	v2 := reflect.ValueOf(a2)
+	if v1.Type() != v2.Type() {
+		return false, errorf("type mismatch %s vs %s", v1.Type(), v2.Type())
+	}
+	return deepValueEqual("", v1, v2, make(map[visit]bool), 0, customCheckFunc)
+}
+
+// CustomCheckFunc should return true for useDefault if DeepEqualWithCustomCheck should behave like DeepEqual.
+// Otherwise the result of the CustomCheckFunc is used.
+type CustomCheckFunc func(path string, a1 interface{}, a2 interface{}) (useDefault bool, equal bool, err error)
 
 // interfaceOf returns v.Interface() even if v.CanInterface() == false.
 // This enables us to call fmt.Printf on a value even if it's derived

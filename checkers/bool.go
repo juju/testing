@@ -115,3 +115,16 @@ func (checker *deepEqualsChecker) Check(params []interface{}, names []string) (r
 	}
 	return true, ""
 }
+
+type ignoreChecker struct {
+	*gc.CheckerInfo
+}
+
+// Ignore always succeeds.
+var Ignore gc.Checker = &ignoreChecker{
+	&gc.CheckerInfo{Name: "Ignore", Params: []string{"obtained"}},
+}
+
+func (checker *ignoreChecker) Check(params []interface{}, names []string) (result bool, error string) {
+	return true, ""
+}
