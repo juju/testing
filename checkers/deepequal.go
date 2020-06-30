@@ -10,6 +10,7 @@ package checkers
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 	"unsafe"
 )
@@ -58,7 +59,7 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 		return &mismatchError{
 			v1:   v1,
 			v2:   v2,
-			path: path,
+			path: strings.Replace(path, topLevel, "", 1),
 			how:  fmt.Sprintf(f, a...),
 		}
 	}
@@ -105,8 +106,8 @@ func deepValueEqual(path string, v1, v2 reflect.Value, visited map[visit]bool, d
 		visited[v] = true
 	}
 
-	if customCheckFunc != nil && v1.CanInterface() && v2.CanInterface() {
-		useDefault, equal, err := customCheckFunc(path, v1.Interface(), v2.Interface())
+	if customCheckFunc != nil {
+		useDefault, equal, err := customCheckFunc(path, interfaceOf(v1), interfaceOf(v2))
 		if !useDefault {
 			return equal, err
 		}
@@ -270,7 +271,7 @@ func DeepEqual(a1, a2 interface{}) (bool, error) {
 	if v1.Type() != v2.Type() {
 		return false, errorf("type mismatch %s vs %s", v1.Type(), v2.Type())
 	}
-	return deepValueEqual("", v1, v2, make(map[visit]bool), 0, nil)
+	return deepValueEqual(topLevel, v1, v2, make(map[visit]bool), 0, nil)
 }
 
 // DeepEqualWithCustomCheck tests for deep equality. It uses normal == equality where
@@ -310,7 +311,7 @@ func DeepEqualWithCustomCheck(a1 interface{}, a2 interface{}, customCheckFunc Cu
 	if v1.Type() != v2.Type() {
 		return false, errorf("type mismatch %s vs %s", v1.Type(), v2.Type())
 	}
-	return deepValueEqual("", v1, v2, make(map[visit]bool), 0, customCheckFunc)
+	return deepValueEqual(topLevel, v1, v2, make(map[visit]bool), 0, customCheckFunc)
 }
 
 // CustomCheckFunc should return true for useDefault if DeepEqualWithCustomCheck should behave like DeepEqual.
@@ -330,17 +331,6 @@ func interfaceOf(v reflect.Value) interface{} {
 }
 
 type flag uintptr
-
-var flagRO flag
-
-// constants copied from reflect/value.go
-const (
-	// The value of flagRO up to and including Go 1.3.
-	flagRO1p3 = 1 << 0
-
-	// The value of flagRO from Go 1.4.
-	flagRO1p4 = 1 << 5
-)
 
 var flagValOffset = func() uintptr {
 	field, ok := reflect.TypeOf(reflect.Value{}).FieldByName("flag")
@@ -373,20 +363,5 @@ func init() {
 	}
 	if field.Type.Kind() != reflect.TypeOf(flag(0)).Kind() {
 		panic("reflect.Value flag field has changed kind")
-	}
-	var t struct {
-		a int
-		A int
-	}
-	vA := reflect.ValueOf(t).FieldByName("A")
-	va := reflect.ValueOf(t).FieldByName("a")
-	flagA := *flagField(&vA)
-	flaga := *flagField(&va)
-
-	// Infer flagRO from the difference between the flags
-	// for the (otherwise identical) fields in t.
-	flagRO = flagA ^ flaga
-	if flagRO != flagRO1p3 && flagRO != flagRO1p4 {
-		panic("reflect.Value read-only flag has changed semantics")
 	}
 }
