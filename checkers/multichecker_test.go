@@ -69,3 +69,96 @@ func (s *MultiCheckerSuite) TestArrayArraysUnorderedWithExpected(c *gc.C) {
 	checker := jc.NewMultiChecker().Add("[1]", jc.SameContents, jc.ExpectedValue)
 	c.Check(a1, checker, a2)
 }
+
+type pod struct {
+	A int
+	a int
+	B bool
+	b bool
+	C string
+	c string
+}
+
+func (s *MultiCheckerSuite) TestPOD(c *gc.C) {
+	a1 := pod{1, 2, true, true, "a", "a"}
+	a2 := pod{2, 3, false, false, "b", "b"}
+
+	checker := jc.NewMultiChecker().
+		Add(".A", jc.Ignore).
+		Add(".a", jc.Ignore).
+		Add(".B", jc.Ignore).
+		Add(".b", jc.Ignore).
+		Add(".C", jc.Ignore).
+		Add(".c", jc.Ignore)
+	c.Check(a1, checker, a2)
+}
+
+func (s *MultiCheckerSuite) TestExprMap(c *gc.C) {
+	a1 := map[string]string{"a": "a", "b": "b", "c": "c"}
+	a2 := map[string]string{"a": "aaaa", "b": "bbbb", "c": "cccc"}
+
+	checker := jc.NewMultiChecker().AddExpr(`_[_]`, jc.Ignore)
+	c.Check(a1, checker, a2)
+}
+
+type complexA struct {
+	complexB
+	A int
+	C []int
+	D map[string]string
+	E *complexE
+	F **complexF
+}
+
+type complexB struct {
+	B string
+	b string
+}
+
+type complexE struct {
+	E string
+}
+
+type complexF struct {
+	F []string
+}
+
+func (s *MultiCheckerSuite) TestExprComplex(c *gc.C) {
+	f1 := &complexF{
+		F: []string{"a", "b"},
+	}
+	a1 := complexA{
+		complexB: complexB{
+			B: "wow",
+			b: "wow",
+		},
+		A: 5,
+		C: []int{0, 1, 2, 3, 4, 5},
+		D: map[string]string{"a": "b"},
+		E: &complexE{E: "E"},
+		F: &f1,
+	}
+	f2 := &complexF{
+		F: []string{"c", "d"},
+	}
+	a2 := complexA{
+		complexB: complexB{
+			B: "cool",
+			b: "cool",
+		},
+		A: 19,
+		C: []int{5, 4, 3, 2, 1, 0},
+		D: map[string]string{"b": "a"},
+		E: &complexE{E: "EEEEEEEEE"},
+		F: &f2,
+	}
+	checker := jc.NewMultiChecker().
+		AddExpr(`_.complexB.B`, jc.Ignore).
+		AddExpr(`_.complexB.b`, jc.Ignore).
+		AddExpr(`_.A`, jc.Ignore).
+		AddExpr(`_.C[_]`, jc.Ignore).
+		AddExpr(`_.D`, jc.Ignore).
+		AddExpr(`(*_.E)`, jc.Ignore).
+		AddExpr(`(*(*_.F)).F[_]`, jc.Ignore)
+	c.Check(a1, checker, a2)
+}
