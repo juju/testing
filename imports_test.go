@@ -25,8 +25,8 @@ var importsTests = []struct {
 	expect:  []string{"checkers"},
 }, {
 	pkgName: "github.com/juju/testing",
-	prefix:  "github.com/juju/utils/",
-	expect:  []string{"clock"},
+	prefix:  "github.com/juju/utils/v2/",
+	expect:  []string{},
 }, {
 	pkgName: "github.com/juju/testing",
 	prefix:  "arble.com/",
