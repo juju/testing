@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/juju/clock"
+	"github.com/juju/collections/set"
 	"github.com/juju/errors"
 	"github.com/juju/loggo"
 	"github.com/juju/retry"
@@ -750,6 +751,10 @@ func clearDatabases(session *mgo.Session) error {
 }
 
 func clearCollections(db *mgo.Database) error {
+	capped, err := listCappedCollections(db)
+	if err != nil {
+		return errors.Annotatef(err, "getting capped collection list")
+	}
 	collectionNames, err := db.CollectionNames()
 	if err != nil {
 		return errors.Trace(err)
@@ -760,11 +765,7 @@ func clearCollections(db *mgo.Database) error {
 		}
 		collection := db.C(name)
 		clearFunc := clearNormalCollection
-		capped, err := isCapped(collection)
-		if err != nil {
-			return errors.Trace(err)
-		}
-		if capped {
+		if capped.Contains(name) {
 			clearFunc = clearCappedCollection
 		}
 		err = clearFunc(collection)
@@ -775,21 +776,48 @@ func clearCollections(db *mgo.Database) error {
 	return nil
 }
 
-func isCapped(collection *mgo.Collection) (bool, error) {
-	result := bson.M{}
-	err := collection.Database.Run(bson.D{{"collstats", collection.Name}}, &result)
+func listCappedCollections(db *mgo.Database) (set.Strings, error) {
+	// Mostly pulled from mgo.DB.ListCollections
+	names := set.NewStrings()
+	var result struct {
+		Collections []bson.Raw
+		Cursor      struct {
+			FirstBatch []bson.Raw `bson:"firstBatch"`
+			NextBatch  []bson.Raw `bson:"nextBatch"`
+			NS         string     `bson:"ns"`
+			ID         int64      `bson:"id"`
+		}
+	}
+	err := db.Run(bson.D{{"listCollections", 1}, {"cursor", bson.D{{"batchSize", 10}}}}, &result)
 	if err != nil {
-		return false, errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
-	value, found := result["capped"]
-	if !found {
-		return false, nil
+	firstBatch := result.Collections
+	if firstBatch == nil {
+		firstBatch = result.Cursor.FirstBatch
 	}
-	capped, ok := value.(bool)
-	if !ok {
-		return false, errors.Errorf("unexpected type for capped: %v", value)
+	var iter *mgo.Iter
+	ns := strings.SplitN(result.Cursor.NS, ".", 2)
+	if len(ns) < 2 {
+		iter = db.C("").NewIter(nil, firstBatch, result.Cursor.ID, nil)
+	} else {
+		iter = db.Session.DB(ns[0]).C(ns[1]).NewIter(nil, firstBatch, result.Cursor.ID, nil)
 	}
-	return capped, nil
+	var coll struct {
+		Name    string `bson:"name"`
+		Options struct {
+			Capped bool `bson:"capped"`
+		} `bson:"options"`
+	}
+	for iter.Next(&coll) {
+		if coll.Options.Capped {
+			names.Add(coll.Name)
+		}
+	}
+	if err := iter.Close(); err != nil {
+		return nil, errors.Trace(err)
+	}
+	return names, nil
 }
 
 func clearNormalCollection(collection *mgo.Collection) error {
