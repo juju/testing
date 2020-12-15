@@ -31,12 +31,13 @@ import (
 	"github.com/juju/errors"
 	"github.com/juju/loggo"
 	"github.com/juju/retry"
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils/v2"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	jc "github.com/juju/testing/checkers"
 )
 
 var (
@@ -45,7 +46,7 @@ var (
 	logger    = loggo.GetLogger("juju.testing")
 
 	// regular expression to match output of mongod
-	waitingForConnectionsRe = regexp.MustCompile(".*waiting for connections.*")
+	waitingForConnectionsRe = regexp.MustCompile(".*[W|w]aiting for connections.*")
 
 	mongo32 = version.Number{Major: 3, Minor: 2}
 
@@ -287,9 +288,6 @@ func (inst *MgoInstance) run() error {
 	mgoargs := []string{
 		"--dbpath", inst.dir,
 		"--port", mgoport,
-		"--nssize", "1",
-		"--noprealloc",
-		"--smallfiles",
 		"--oplogSize", "10",
 		"--ipv6",
 		"--setParameter", "enableTestCommands=1",
@@ -330,6 +328,11 @@ func (inst *MgoInstance) run() error {
 		storageEngine := mongoStorageEngine(inst.EnableReplicaSet)
 		if storageEngine != "" {
 			mgoargs = append(mgoargs, "--storageEngine", storageEngine)
+			if storageEngine == "mmapv1" {
+				mgoargs = append(mgoargs, "--nssize", "1",
+					"--noprealloc",
+					"--smallfiles")
+			}
 		}
 	}
 
