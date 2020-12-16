@@ -115,6 +115,10 @@ type MgoInstance struct {
 	// WithoutV8 is true if we believe this Mongo doesn't actually have the
 	// V8 engine
 	WithoutV8 bool
+
+	// MaxTransactionLockRequestTimeout is used for the mongo
+	// maxTransactionLockRequestTimeoutMillis server setting (v4+).
+	MaxTransactionLockRequestTimeout time.Duration
 }
 
 // Addr returns the address of the MongoDB server.
@@ -203,7 +207,7 @@ func getHome() (string, error) {
 // Start starts a MongoDB server in a temporary directory.
 func (inst *MgoInstance) Start(certs *Certs) error {
 	var err error
-	mongopath, _, err := installedMongod.Get()
+	mongopath, vers, err := installedMongod.Get()
 	if err != nil {
 		return err
 	}
@@ -258,7 +262,7 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 		inst.port = FindTCPPort()
 		inst.addr = fmt.Sprintf("localhost:%d", inst.port)
 		inst.dir = dbdir
-		err = inst.run()
+		err = inst.run(vers)
 		switch err.(type) {
 		case addrAlreadyInUseError:
 			logger.Debugf("failed to start mongo: %v, trying another port", err)
@@ -279,7 +283,7 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 
 // run runs the MongoDB server at the
 // address and directory already configured.
-func (inst *MgoInstance) run() error {
+func (inst *MgoInstance) run(vers version.Number) error {
 	if inst.server != nil {
 		panic("mongo server is already running")
 	}
@@ -307,6 +311,11 @@ func (inst *MgoInstance) run() error {
 	}
 	if inst.EnableReplicaSet {
 		mgoargs = append(mgoargs, "--replSet=juju")
+	}
+	if vers.Major >= 4 && inst.MaxTransactionLockRequestTimeout > 0 {
+		arg := fmt.Sprintf("maxTransactionLockRequestTimeoutMillis=%d",
+			inst.MaxTransactionLockRequestTimeout/time.Millisecond)
+		mgoargs = append(mgoargs, "--setParameter", arg)
 	}
 	if inst.certs != nil {
 		mgoargs = append(mgoargs,
