@@ -424,20 +424,7 @@ func mongoStorageEngine(replicaset bool) string {
 	if storageEngine != "" {
 		return storageEngine
 	}
-	switch runtime.GOARCH {
-	case "amd64":
-		if replicaset {
-			// Use 'wiredTiger' unless explicitly requested to use a
-			// different backend.  mmapv1 is generally available, but
-			// doesn't support things like server-side transactions, and
-			// also isn't our production backend.
-			return "wiredTiger"
-		} else {
-			// We use mmapv1 in the test suite as it can be 3-4x faster in many tests.
-			return "mmapv1"
-		}
-	}
-	return "" // use the default
+	return "ephemeralForTest"
 }
 
 // mongodCache looks up mongod path and version and caches the result.
