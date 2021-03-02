@@ -30,12 +30,12 @@ import (
 	"github.com/juju/collections/set"
 	"github.com/juju/errors"
 	"github.com/juju/loggo"
+	"github.com/juju/mgo/v2"
+	"github.com/juju/mgo/v2/bson"
 	"github.com/juju/retry"
 	"github.com/juju/utils/v2"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	jc "github.com/juju/testing/checkers"
 )
@@ -334,7 +334,7 @@ func (inst *MgoInstance) run(vers version.Number) error {
 		mgoargs = append(mgoargs, "--nojournal")
 	}
 	if version.Compare(storageEngineMongoVersion) >= 0 {
-		storageEngine := mongoStorageEngine(inst.EnableReplicaSet)
+		storageEngine := mongoStorageEngine()
 		if storageEngine != "" {
 			mgoargs = append(mgoargs, "--storageEngine", storageEngine)
 			if storageEngine == "mmapv1" {
@@ -419,23 +419,15 @@ func (inst *MgoInstance) run(vers version.Number) error {
 	return nil
 }
 
-func mongoStorageEngine(replicaset bool) string {
+func mongoStorageEngine() string {
 	storageEngine := os.Getenv("JUJU_MONGO_STORAGE_ENGINE")
 	if storageEngine != "" {
 		return storageEngine
 	}
 	switch runtime.GOARCH {
 	case "amd64":
-		if replicaset {
-			// Use 'wiredTiger' unless explicitly requested to use a
-			// different backend.  mmapv1 is generally available, but
-			// doesn't support things like server-side transactions, and
-			// also isn't our production backend.
-			return "wiredTiger"
-		} else {
-			// We use mmapv1 in the test suite as it can be 3-4x faster in many tests.
-			return "mmapv1"
-		}
+		// Wired tiger is always available from 3.x onwards.
+		return "wiredTiger"
 	}
 	return "" // use the default
 }
