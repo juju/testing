@@ -763,6 +763,20 @@ func clearCollections(db *mgo.Database) error {
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	// The "logs" db is special because tests create namespaced capped
+	// collections for their logs. Contrary to the other DBs where we
+	// just flush their contents, we need to drop any collection in the
+	// "logs" db to avoid an unbounded growth of capped collections.
+	if db.Name == "logs" {
+		for _, name := range collectionNames {
+			if err = db.C(name).DropCollection(); err != nil {
+				return errors.Trace(err)
+			}
+		}
+		return nil
+	}
+
 	for _, name := range collectionNames {
 		if strings.HasPrefix(name, "system.") {
 			continue
