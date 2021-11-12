@@ -151,6 +151,10 @@ type MgoSuite struct {
 	// logging or debugging in mgo adds a significant overhead to the
 	// Juju tests, so they are disabled by default.
 	DebugMgo bool
+
+	// SkipTestCleanup controls collection cleanup in TearDownTest.
+	// When set to true, TearDownTest will not delete collections.
+	SkipTestCleanup bool
 }
 
 // generatePEM receives server certificate and the server private key
@@ -1008,10 +1012,12 @@ func (s *MgoSuite) TearDownTest(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 	}
 
-	// Rather than dropping the databases (which is very slow in Mongo
-	// 3.2) we clear all of the collections.
-	err = clearDatabases(s.Session)
-	c.Assert(err, jc.ErrorIsNil)
+	if !s.SkipTestCleanup {
+		// Rather than dropping the databases (which is very slow in Mongo
+		// 3.2) we clear all of the collections.
+		err = clearDatabases(s.Session)
+		c.Assert(err, jc.ErrorIsNil)
+	}
 	s.Session.Close()
 	s.Session = nil
 
