@@ -4,9 +4,10 @@
 package testing_test
 
 import (
+	gc "gopkg.in/check.v1"
+
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 )
 
 type importsSuite struct {
@@ -25,7 +26,7 @@ var importsTests = []struct {
 	expect:  []string{"checkers"},
 }, {
 	pkgName: "github.com/juju/testing",
-	prefix:  "github.com/juju/utils/v2/",
+	prefix:  "github.com/juju/utils/v3/",
 	expect:  []string{},
 }, {
 	pkgName: "github.com/juju/testing",
