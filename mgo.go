@@ -34,7 +34,7 @@ import (
 	"github.com/juju/mgo/v2/bson"
 	"github.com/juju/retry"
 	"github.com/juju/utils/v3"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
 
 	jc "github.com/juju/testing/checkers"
