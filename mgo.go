@@ -42,7 +42,9 @@ import (
 
 var (
 	// MgoServer is a shared mongo server used by tests.
-	MgoServer = &MgoInstance{}
+	MgoServer = &MgoInstance{
+		EnableReplicaSet: true,
+	}
 	logger    = loggo.GetLogger("juju.testing")
 
 	// regular expression to match output of mongod
