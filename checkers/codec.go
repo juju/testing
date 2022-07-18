@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/juju/mgo/v2/bson"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
 )
@@ -16,17 +15,6 @@ type codecEqualChecker struct {
 	name      string
 	marshal   func(interface{}) ([]byte, error)
 	unmarshal func([]byte, interface{}) error
-}
-
-// BSONEquals defines a checker that checks whether a byte slice, when
-// unmarshaled as BSON, is equal to the given value. Rather than
-// unmarshaling into something of the expected body type, we reform
-// the expected body in BSON and back to interface{} so we can check
-// the whole content. Otherwise we lose information when unmarshaling.
-var BSONEquals = &codecEqualChecker{
-	name:      "BSONEquals",
-	marshal:   bson.Marshal,
-	unmarshal: bson.Unmarshal,
 }
 
 // JSONEquals defines a checker that checks whether a byte slice, when
