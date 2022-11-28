@@ -53,10 +53,14 @@ func PatchValue(dest, value interface{}) Restorer {
 // environment variable. A function is returned that will return the
 // environment to what it was before.
 func PatchEnvironment(name, value string) Restorer {
-	oldValue := os.Getenv(name)
-	os.Setenv(name, value)
+	oldValue, oldValueSet := os.LookupEnv(name)
+	_ = os.Setenv(name, value)
 	return func() {
-		os.Setenv(name, oldValue)
+		if oldValueSet {
+			_ = os.Setenv(name, oldValue)
+		} else {
+			_ = os.Unsetenv(name)
+		}
 	}
 }
 

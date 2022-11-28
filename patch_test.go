@@ -65,14 +65,40 @@ var _ = gc.Suite(&PatchEnvironmentSuite{})
 func (*PatchEnvironmentSuite) TestPatchEnvironment(c *gc.C) {
 	const envName = "TESTING_PATCH_ENVIRONMENT"
 	// remember the old value, and set it to something we can check
-	oldValue := os.Getenv(envName)
-	os.Setenv(envName, "initial")
+	oldValue, oldValueSet := os.LookupEnv(envName)
+	defer func() {
+		if oldValueSet {
+			_ = os.Setenv(envName, oldValue)
+		} else {
+			_ = os.Unsetenv(envName)
+		}
+	}()
+
+	_ = os.Setenv(envName, "initial")
 	restore := testing.PatchEnvironment(envName, "new value")
 	// Using check to make sure the environment gets set back properly in the test.
 	c.Check(os.Getenv(envName), gc.Equals, "new value")
 	restore()
 	c.Check(os.Getenv(envName), gc.Equals, "initial")
-	os.Setenv(envName, oldValue)
+}
+
+func (*PatchEnvironmentSuite) TestPatchEnvironmentWithAbsentVar(c *gc.C) {
+	const envName = "TESTING_PATCH_ENVIRONMENT"
+	// remember the old value, and unset the var
+	oldValue, oldValueSet := os.LookupEnv(envName)
+	defer func() {
+		if oldValueSet {
+			_ = os.Setenv(envName, oldValue)
+		}
+	}()
+
+	_ = os.Unsetenv(envName)
+	restore := testing.PatchEnvironment(envName, "new value")
+
+	c.Check(os.Getenv(envName), gc.Equals, "new value")
+	restore()
+	_, set := os.LookupEnv(envName)
+	c.Check(set, gc.Equals, false)
 }
 
 func (*PatchEnvironmentSuite) TestRestorerAdd(c *gc.C) {
@@ -89,7 +115,7 @@ func (*PatchEnvironmentSuite) TestPatchEnvPathPrepend(c *gc.C) {
 	dir := "/bin/bar"
 
 	// just in case something goes wrong
-	defer os.Setenv("PATH", oldPath)
+	defer func() { _ = os.Setenv("PATH", oldPath) }()
 
 	restore := testing.PatchEnvPathPrepend(dir)
 
