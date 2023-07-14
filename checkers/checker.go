@@ -151,7 +151,8 @@ type sameContents struct {
 
 // SameContents checks that the obtained slice contains all the values (and
 // same number of values) of the expected slice and vice versa, without respect
-// to order or duplicates. Uses DeepEquals on mapped contents to compare.
+// to order or duplicates. Uses DeepEquals on contents to compare. Content types
+// do not need to be hashable, but must satisfy reflect.DeepEquals.
 var SameContents gc.Checker = &sameContents{
 	&gc.CheckerInfo{Name: "SameContents", Params: []string{"obtained", "expected"}},
 }
@@ -190,16 +191,29 @@ func (checker *sameContents) Check(params []interface{}, names []string) (result
 		return false, ""
 	}
 
-	// spin up maps with the entries as keys and the counts as values
-	mob := make(map[interface{}]int, length)
-	mexp := make(map[interface{}]int, length)
+	// left is the expected
+	left := make([]any, 0, length)
+	// right is the obtained
+	right := make([]any, 0, length)
 
 	for i := 0; i < length; i++ {
-		mexp[reflect.Indirect(vexp.Index(i)).Interface()]++
-		mob[reflect.Indirect(vob.Index(i)).Interface()]++
+		left = append(left, reflect.Indirect(vexp.Index(i)).Interface())
+		right = append(right, reflect.Indirect(vob.Index(i)).Interface())
 	}
 
-	return reflect.DeepEqual(mob, mexp), ""
+outer:
+	for i := 0; i < len(left); i++ {
+		for j, r := range right {
+			if reflect.DeepEqual(left[i], r) {
+				left = append(left[:i], left[i+1:]...)
+				right = append(right[:j], right[j+1:]...)
+				i--
+				continue outer
+			}
+		}
+	}
+
+	return len(left) == 0 && len(right) == 0, ""
 }
 
 type errorIsNilChecker struct {
@@ -211,8 +225,7 @@ type errorIsNilChecker struct {
 //
 // For example:
 //
-//    c.Assert(err, ErrorIsNil)
-//
+//	c.Assert(err, ErrorIsNil)
 var ErrorIsNil gc.Checker = &errorIsNilChecker{
 	&gc.CheckerInfo{Name: "ErrorIsNil", Params: []string{"value"}},
 }
