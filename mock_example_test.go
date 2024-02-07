@@ -2,10 +2,10 @@ package testing_test
 
 import (
 	"fmt"
-
 	"log"
 
-	"github.com/juju/loggo"
+	"github.com/juju/loggo/v2"
+
 	"github.com/juju/testing"
 )
 

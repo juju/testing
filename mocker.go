@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/juju/loggo"
+	"github.com/juju/loggo/v2"
 )
 
 // NewCallMocker returns a CallMocker which will log calls and results
