@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/juju/utils/v3"
+	"github.com/juju/utils/v4"
 	gc "gopkg.in/check.v1"
 
 	jc "github.com/juju/testing/checkers"
